@@ -5,9 +5,21 @@ form.date.value = new Date().toISOString().slice(0, 10);
 form.recipientPhone.value = localStorage.getItem(phoneKey) || '';
 
 function readImages(files) {
-  return Promise.all([...files].map(file => new Promise((resolve, reject) => {
+  return Promise.all([...files].slice(0, 5).map(file => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, data: reader.result });
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve({ name: file.name, data: canvas.toDataURL('image/jpeg', 0.78) });
+      };
+      image.onerror = reject;
+      image.src = reader.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   })));
@@ -32,9 +44,12 @@ function greeting(date) {
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton.disabled) return;
   const phone = form.recipientPhone.value.trim();
   const international = phone.replace(/[\s().-]/g, '');
   if (!/^\+\d{8,15}$/.test(international)) { status.textContent = 'Erreur : utilisez un numéro international, par exemple +2250700000000.'; return; }
+  submitButton.disabled = true;
   status.textContent = 'Enregistrement en cours…';
   try {
     const data = Object.fromEntries(new FormData(form));
@@ -56,5 +71,8 @@ form.addEventListener('submit', async event => {
       window.open(`https://wa.me/${international.slice(1)}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
       status.textContent = '✓ Enregistré. Le PDF est téléchargé et WhatsApp est ouvert.';
     }
-  } catch (error) { status.textContent = `Erreur : ${error.message}`; }
+  } catch (error) {
+    if (error.name === 'AbortError') status.textContent = 'Partage annulé. Vous pouvez recommencer.';
+    else status.textContent = `Erreur : ${error.message}`;
+  } finally { submitButton.disabled = false; }
 });

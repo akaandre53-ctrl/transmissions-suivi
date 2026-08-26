@@ -8,6 +8,7 @@ const port = Number(process.env.PORT || 3000);
 const clean = value => String(value ?? '').trim();
 const item = (label, value) => clean(value) ? `${label} : ${clean(value)}` : null;
 const columnName = number => { let name = ''; for (let value = number; value > 0; value = Math.floor((value - 1) / 26)) name = String.fromCharCode(65 + ((value - 1) % 26)) + name; return name; };
+const requests = new Map();
 const fields = [
   ['date', 'Date'], ['sleep', 'Sommeil'], ['wake', 'Etat au reveil'], ['complaints', 'Plaintes / inconforts'],
   ['bpLeftMorning', 'TA bras gauche matin'], ['bpRightMorning', 'TA bras droit matin'], ['pulseMorning', 'Pouls matin'], ['glucoseMorning', 'Glycemie matin'],
@@ -18,8 +19,18 @@ const fields = [
   ['daySummary', 'Bilan general'], ['recipientPhone', 'Numero WhatsApp destinataire'], ['dayImages', 'Images de la journee']
 ];
 
-app.use(express.json({ limit: '12mb' }));
+app.use(express.json({ limit: '8mb' }));
 app.use(express.static('public'));
+
+app.use('/api', (req, res, next) => {
+  const address = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const recent = (requests.get(address) || []).filter(time => now - time < 10 * 60 * 1000);
+  if (recent.length >= 20) return res.status(429).json({ ok: false, error: 'Trop de tentatives. Reessayez dans quelques minutes.' });
+  recent.push(now);
+  requests.set(address, recent);
+  next();
+});
 
 function makeMessage(data) {
   const groups = [
@@ -71,7 +82,9 @@ function pdfBuffer(data, message) {
 }
 
 app.post('/api/transmissions', async (req, res) => {
-  const data = req.body || {};
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ ok: false, error: 'Donnees de transmission invalides.' });
+  const data = req.body;
+  if (Array.isArray(data.imageData) && data.imageData.length > 5) return res.status(400).json({ ok: false, error: 'Cinq images maximum sont autorisees.' });
   const message = makeMessage(data);
   try {
     await saveToSheet(data, message);
