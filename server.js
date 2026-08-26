@@ -78,11 +78,12 @@ function pdfBuffer(data, message) {
     for (const block of message.split('\n\n')) {
       const lines = block.split('\n');
       document.moveDown(1).fontSize(13).fillColor('#176b5a').text(lines[0]);
-      document.moveDown(0.2).fontSize(10).fillColor('#222').text(lines.slice(1).join('\n') || 'Aucune information renseignee.');
+      const pdfLines = lines.slice(1).filter(line => !line.startsWith('Images jointes :'));
+      document.moveDown(0.2).fontSize(10).fillColor('#222').text(pdfLines.join('\n') || 'Aucune information renseignee.');
     }
     for (const image of Array.isArray(data.imageData) ? data.imageData : []) {
       if (!clean(image.data).startsWith('data:image/')) continue;
-      document.addPage().fontSize(13).fillColor('#176b5a').text(`${image.category || 'Photo'} : ${image.name || 'Image de la journee'}`);
+      document.addPage().fontSize(13).fillColor('#176b5a').text(image.category || 'Photo de la journee');
       document.image(image.data, { fit: [510, 700], align: 'center', valign: 'center' });
     }
     document.end();
