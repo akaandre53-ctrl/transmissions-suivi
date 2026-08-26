@@ -86,7 +86,7 @@ function pdfBuffer(data, message) {
     for (const image of Array.isArray(data.imageData) ? data.imageData : []) {
       if (!clean(image.data).startsWith('data:image/')) continue;
       document.addPage().fontSize(13).fillColor('#176b5a').text(image.category || 'Photo de la journee');
-      document.image(image.data, { fit: [510, 700], align: 'center', valign: 'center' });
+      document.image(image.data, { fit: [420, 500], align: 'center', valign: 'center' });
     }
     document.end();
   });
