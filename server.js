@@ -34,7 +34,9 @@ function makeMessage(data) {
 
 function getAuth() {
   if (!process.env.GOOGLE_SHEET_ID || !process.env.GOOGLE_APPLICATION_CREDENTIALS) throw Error('GOOGLE_SHEET_ID et GOOGLE_APPLICATION_CREDENTIALS doivent etre renseignes.');
-  return new google.auth.GoogleAuth({ keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+  const credentials = clean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  const options = credentials.startsWith('{') ? { credentials: JSON.parse(credentials) } : { keyFile: credentials };
+  return new google.auth.GoogleAuth({ ...options, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
 }
 
 async function saveToSheet(data, message) {
@@ -80,4 +82,6 @@ app.post('/api/transmissions', async (req, res) => {
   }
 });
 
-app.listen(port, () => console.log(`Application ouverte sur http://localhost:${port}`));
+export default app;
+
+if (process.env.VERCEL !== '1') app.listen(port, () => console.log(`Application ouverte sur http://localhost:${port}`));
