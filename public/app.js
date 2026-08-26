@@ -4,7 +4,14 @@ const phoneKey = 'transmission-maman-whatsapp';
 form.date.value = new Date().toISOString().slice(0, 10);
 form.recipientPhone.value = localStorage.getItem(phoneKey) || '';
 
-function readImages(files) {
+document.querySelectorAll('[data-toggle]').forEach(select => {
+  const target = document.querySelector(`#${select.dataset.toggle}`);
+  const update = () => { target.classList.toggle('visible', select.value === 'Oui'); };
+  select.addEventListener('change', update);
+  update();
+});
+
+function readImages(files, category) {
   return Promise.all([...files].slice(0, 5).map(file => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -15,7 +22,7 @@ function readImages(files) {
         canvas.width = Math.round(image.width * scale);
         canvas.height = Math.round(image.height * scale);
         canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve({ name: file.name, data: canvas.toDataURL('image/jpeg', 0.78) });
+        resolve({ name: file.name, category, data: canvas.toDataURL('image/jpeg', 0.78) });
       };
       image.onerror = reject;
       image.src = reader.result;
@@ -53,7 +60,10 @@ form.addEventListener('submit', async event => {
   status.textContent = 'Enregistrement en cours…';
   try {
     const data = Object.fromEntries(new FormData(form));
-    const images = await readImages(form.dayImages.files);
+    const images = [];
+    for (const input of form.querySelectorAll('input[type="file"]')) {
+      images.push(...await readImages(input.files, input.closest('label').firstChild.textContent.trim()));
+    }
     data.dayImages = images.map(image => image.name).join(', ');
     data.imageData = images;
     data.recipientPhone = international;
