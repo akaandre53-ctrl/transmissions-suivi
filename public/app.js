@@ -13,13 +13,21 @@ function readImages(files) {
   })));
 }
 
-function downloadPdf(base64, filename) {
+function pdfFile(base64, filename) {
   const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+  return new File([bytes], filename, { type: 'application/pdf' });
+}
+
+function downloadFile(file) {
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-  link.download = filename;
+  link.href = URL.createObjectURL(file);
+  link.download = file.name;
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function greeting(date) {
+  return `Bonjour, veuillez trouver ci-joint la transmission quotidienne de maman du ${date}. Bonne réception et bonne journée.`;
 }
 
 form.addEventListener('submit', async event => {
@@ -38,8 +46,15 @@ form.addEventListener('submit', async event => {
     const response = await fetch('/api/transmissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Impossible d’enregistrer la transmission.');
-    downloadPdf(result.pdf, result.filename);
-    window.open(`https://wa.me/${international.slice(1)}?text=${encodeURIComponent(result.message)}`, '_blank', 'noopener');
-    status.textContent = '✓ Enregistré. Le PDF est téléchargé et WhatsApp est ouvert.';
+    const file = pdfFile(result.pdf, result.filename);
+    const message = greeting(form.date.value);
+    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+      await navigator.share({ files: [file], text: message });
+      status.textContent = '✓ Enregistré. Choisissez WhatsApp, le destinataire, puis envoyez le PDF.';
+    } else {
+      downloadFile(file);
+      window.open(`https://wa.me/${international.slice(1)}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+      status.textContent = '✓ Enregistré. Le PDF est téléchargé et WhatsApp est ouvert.';
+    }
   } catch (error) { status.textContent = `Erreur : ${error.message}`; }
 });
