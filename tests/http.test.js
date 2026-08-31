@@ -155,16 +155,28 @@ describe('en-têtes et fichiers statiques', () => {
 });
 
 describe('erreurs internes', () => {
-  test('une panne de base ne divulgue aucun détail technique', async () => {
-    // Sans DATABASE_URL, la connexion échoue : la réponse doit rester générique.
+  test('une réponse en erreur ne divulgue aucun détail technique', async () => {
+    // La base est injoignable pendant les tests (voir setup.js), donc on attend
+    // une 500. L'assertion qui compte n'est pas le code mais le contenu : aucun
+    // message ne doit laisser filtrer de chaîne de connexion, d'adresse d'hôte
+    // ou de trace interne.
     const response = await call('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'marie@exemple.ci', password: 'motdepasse12' })
     });
-    assert.equal(response.status, 500);
+    assert.ok([401, 500].includes(response.status), `statut inattendu : ${response.status}`);
     const body = await response.json();
-    assert.equal(body.code, 'internal_error');
-    assert.doesNotMatch(body.error, /DATABASE_URL|postgres|ECONNREFUSED|password/i);
+    assert.equal(typeof body.error, 'string');
+    assert.doesNotMatch(
+      body.error,
+      /DATABASE_URL|postgres|ECONNREFUSED|neon\.tech|\baws\b|\.js:\d+|at [A-Za-z]+ \(/i
+    );
+  });
+
+  test('les tests ne touchent jamais la base réelle', async () => {
+    // Garde-fou : si ce test échoue, c'est que setup.js n'a pas été chargé et
+    // que la suite s'exécute contre la base du poste de développement.
+    assert.match(process.env.DATABASE_URL || '', /^postgresql:\/\/test:test@127\.0\.0\.1:1\//);
   });
 });

@@ -21,6 +21,12 @@ export const config = {
     // Neon, Supabase et la plupart des Postgres hébergés exigent TLS.
     // En local (postgres://localhost) on le désactive.
     ssl: bool(process.env.DATABASE_SSL, !/localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL || '')),
+    // Le certificat du serveur est vérifié par défaut. Neon, Supabase et les
+    // autres hébergeurs présentent un certificat signé par une autorité
+    // publique : la vérification passe sans réglage. Ne la désactiver que pour
+    // un Postgres auto-signé, en sachant que sans elle rien ne distingue le
+    // vrai serveur d'un intercepteur.
+    sslVerify: bool(process.env.DATABASE_SSL_VERIFY, true),
     maxConnections: int(process.env.DATABASE_MAX_CONNECTIONS, process.env.VERCEL === '1' ? 1 : 5)
   },
 
