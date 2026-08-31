@@ -42,6 +42,10 @@ export async function submitTransmission({ user, payload }) {
 
   const summary = buildSummary(values, { photoCount: owned.length });
 
+  // Toutes les requêtes de ce bloc passent par `client`, la connexion que la
+  // transaction a réservée. En repasser une seule par le pool provoquerait un
+  // interblocage là où le pool est limité à une connexion, c'est-à-dire en
+  // production, et nulle part ailleurs.
   const { row, created } = await transaction(async client => {
     const result = await repo.insertIdempotent({
       clientRef,
@@ -51,7 +55,7 @@ export async function submitTransmission({ user, payload }) {
       data: values,
       summary,
       sheetStatus: isSheetsConfigured() ? 'pending' : 'skipped'
-    });
+    }, client);
     if (result.created && imageIds.length) {
       await imagesRepo.attachToTransmission(imageIds, result.row.id, user.id, client);
     }

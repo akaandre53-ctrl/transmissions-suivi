@@ -161,8 +161,23 @@ la référence du brouillon empêche la création d'une deuxième ligne.
 npm test
 ```
 
-43 tests, sans base de données requise : schéma, validation, résumé, génération
-PDF, et contrat HTTP (authentification, CSRF, format des réponses d'erreur).
+44 tests hors-ligne : schéma, validation, résumé, génération PDF, et contrat HTTP
+(authentification, CSRF, format des réponses d'erreur). Ils ne touchent jamais la
+base — `tests/setup.js` fixe `DATABASE_URL` sur un port fermé.
+
+```bash
+npm run check:db
+```
+
+Contrôle d'intégration contre la vraie base, **à lancer avant chaque mise en
+production**. Il déroule le parcours complet — connexion, photo, enregistrement,
+idempotence, PDF, cloisonnement — puis efface ce qu'il a créé.
+
+Il force le pool à **une seule connexion**, comme en environnement serverless.
+Cette contrainte n'est pas cosmétique : elle a révélé un interblocage invisible
+en local, où une transaction détenait l'unique connexion pendant qu'une requête
+en réclamait une autre au pool. Ne relevez pas cette limite pour faire passer le
+contrôle.
 
 ---
 

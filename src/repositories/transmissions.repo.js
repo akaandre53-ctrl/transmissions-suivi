@@ -12,8 +12,17 @@ const LIST_COLUMNS = `
  *
  * @returns {{ row: object, created: boolean }}
  */
-export async function insertIdempotent({ clientRef, authorId, entryDate, personName, data, summary, sheetStatus }) {
-  const { rows } = await query(
+export async function insertIdempotent(
+  { clientRef, authorId, entryDate, personName, data, summary, sheetStatus },
+  client = null
+) {
+  // `client` est obligatoire quand l'appel a lieu dans une transaction : celle-ci
+  // détient déjà une connexion, et le pool n'en compte qu'une en environnement
+  // serverless. Repasser par le pool attendrait une connexion que la transaction
+  // ne libérera qu'après cet appel — un interblocage jusqu'à expiration.
+  const run = client ? client.query.bind(client) : query;
+
+  const { rows } = await run(
     `INSERT INTO transmissions (client_ref, author_id, entry_date, person_name, data, summary, sheet_status)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
      ON CONFLICT (client_ref) DO NOTHING
@@ -22,7 +31,7 @@ export async function insertIdempotent({ clientRef, authorId, entryDate, personN
   );
   if (rows[0]) return { row: rows[0], created: true };
 
-  const existing = await query('SELECT * FROM transmissions WHERE client_ref = $1', [clientRef]);
+  const existing = await run('SELECT * FROM transmissions WHERE client_ref = $1', [clientRef]);
   return { row: existing.rows[0], created: false };
 }
 
