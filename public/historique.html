@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0F6B57">
+  <title>Historique des transmissions</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <p class="topbar__title">Historique<span id="user-name">…</span></p>
+    <a class="btn btn--quiet" href="/" id="new-link">Nouvelle</a>
+    <button type="button" class="btn btn--quiet" id="logout">Quitter</button>
+  </div>
+</header>
+
+<main class="shell" style="padding-top:24px;padding-bottom:48px">
+  <div class="alert alert--error" id="error" role="alert" tabindex="-1" hidden></div>
+
+  <div id="loading" class="empty">
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Chargement…</p>
+  </div>
+
+  <ul class="entries" id="entries" hidden></ul>
+
+  <div class="empty" id="empty" hidden>
+    <p>Aucune transmission enregistrée pour le moment.</p>
+  </div>
+
+  <div class="row" style="justify-content:center;margin-top:24px">
+    <button type="button" class="btn btn--ghost" id="more" hidden>Charger les précédentes</button>
+  </div>
+</main>
+
+<script type="module">
+import { ApiError, api, fetchPdf } from '/js/api.js';
+
+const list = document.querySelector('#entries');
+const loading = document.querySelector('#loading');
+const empty = document.querySelector('#empty');
+const error = document.querySelector('#error');
+const more = document.querySelector('#more');
+
+let cursor = null;
+let user = null;
+
+const SHEET_LABEL = {
+  synced: ['tag--ok', 'Copié dans Sheets'],
+  pending: ['tag--pending', 'Copie en attente'],
+  failed: ['tag--failed', 'Copie échouée'],
+  skipped: ['tag--pending', 'Sheets non configuré']
+};
+
+const formatDate = iso => new Date(`${iso}T00:00:00Z`).toLocaleDateString('fr-FR', {
+  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+});
+
+function card(item) {
+  const li = document.createElement('li');
+  const article = document.createElement('article');
+  article.className = 'entry';
+
+  const top = document.createElement('div');
+  top.className = 'entry__top';
+  const date = document.createElement('p');
+  date.className = 'entry__date';
+  date.textContent = formatDate(item.entryDate);
+  const meta = document.createElement('p');
+  meta.className = 'entry__meta';
+  meta.textContent = item.authorName;
+  top.append(date, meta);
+
+  const person = document.createElement('p');
+  person.className = 'entry__meta';
+  person.textContent = item.personName;
+
+  const summary = document.createElement('p');
+  summary.className = 'entry__summary';
+  // Le résumé commence par l'en-tête « Transmission du … » : on l'enlève,
+  // la date est déjà affichée juste au-dessus.
+  summary.textContent = item.summary.split('\n\n').slice(1).join(' · ').replace(/\n/g, ' · ');
+
+  const actions = document.createElement('div');
+  actions.className = 'entry__actions';
+
+  const pdf = document.createElement('button');
+  pdf.type = 'button';
+  pdf.className = 'btn btn--ghost';
+  pdf.textContent = 'PDF';
+  pdf.addEventListener('click', () => downloadPdf(item, pdf));
+
+  const [tagClass, tagText] = SHEET_LABEL[item.sheetStatus] || SHEET_LABEL.pending;
+  const tag = document.createElement('span');
+  tag.className = `tag ${tagClass}`;
+  tag.textContent = tagText;
+
+  actions.append(pdf, tag);
+  article.append(top, person, summary, actions);
+  li.append(article);
+  return li;
+}
+
+async function downloadPdf(item, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Préparation…';
+  try {
+    const file = await fetchPdf(`/api/transmissions/${item.id}/pdf`, `transmission-${item.entryDate}.pdf`);
+    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+      await navigator.share({ files: [file] });
+    } else {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  } catch (caught) {
+    if (caught?.name !== 'AbortError') show(caught.message || 'PDF indisponible.');
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+function show(message) {
+  error.textContent = message;
+  error.hidden = false;
+  error.focus();
+}
+
+async function load() {
+  try {
+    const result = await api.list({ limit: 20, ...(cursor ? { before: cursor } : {}) });
+    loading.hidden = true;
+
+    if (!result.items.length && !cursor) {
+      empty.hidden = false;
+      return;
+    }
+    list.hidden = false;
+    for (const item of result.items) list.append(card(item));
+
+    cursor = result.items.at(-1)?.createdAt || null;
+    more.hidden = result.items.length < 20;
+  } catch (caught) {
+    loading.hidden = true;
+    show(caught.message || 'Chargement impossible.');
+  }
+}
+
+(async () => {
+  const me = await api.me().catch(caught => {
+    if (caught instanceof ApiError && caught.status === 401) return null;
+    throw caught;
+  });
+  if (!me?.user) {
+    location.replace(`/login.html?suite=${encodeURIComponent(location.pathname)}`);
+    return;
+  }
+  user = me.user;
+  document.querySelector('#user-name').textContent = user.fullName;
+  // La famille consulte, elle ne saisit pas : le lien de création est masqué.
+  if (user.role === 'famille') document.querySelector('#new-link').hidden = true;
+
+  document.querySelector('#logout').addEventListener('click', async () => {
+    await api.logout().catch(() => {});
+    location.href = '/login.html';
+  });
+  more.addEventListener('click', load);
+
+  await load();
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,14 @@
 {
   "functions": {
-    "api/**/*.js": {
-      "includeFiles": "node_modules/pdfkit/js/**"
+    "api/index.js": {
+      "includeFiles": "node_modules/pdfkit/js/**",
+      "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/admin/maintenance", "schedule": "0 3 * * *" }
+  ]
 }

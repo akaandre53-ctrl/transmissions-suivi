@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0F6B57">
+  <title>Connexion — Transmission</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<main class="auth">
+  <div class="auth__card">
+    <div class="auth__head">
+      <p class="eyebrow">Accompagnement à domicile</p>
+      <h1>Connexion</h1>
+      <p>Identifiez-vous pour saisir ou consulter les transmissions.</p>
+    </div>
+
+    <div class="alert alert--error" id="error" role="alert" tabindex="-1" hidden></div>
+
+    <form id="form" class="stack" novalidate>
+      <div class="field">
+        <label class="field__label" for="email">Adresse e-mail</label>
+        <div class="field__control">
+          <input id="email" name="email" type="email" inputmode="email"
+                 autocomplete="username" required autocapitalize="none" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="password">Mot de passe</label>
+        <div class="field__control">
+          <input id="password" name="password" type="password"
+                 autocomplete="current-password" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn--primary" id="submit">Se connecter</button>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <p class="muted" style="margin-top:24px">
+      Pas encore de compte ? Demandez-en la création à la personne qui administre
+      l’application.
+    </p>
+  </div>
+</main>
+
+<script type="module">
+import { api, ApiError } from '/js/api.js';
+
+const form = document.querySelector('#form');
+const error = document.querySelector('#error');
+const status = document.querySelector('#status');
+const submit = document.querySelector('#submit');
+
+const nextUrl = () => {
+  const wanted = new URLSearchParams(location.search).get('suite');
+  // On ne redirige que vers un chemin interne : un « suite » contrôlé par
+  // l'extérieur ne doit pas pouvoir envoyer l'utilisateur ailleurs.
+  return wanted && /^\/[A-Za-z0-9._~/-]*$/.test(wanted) ? wanted : '/';
+};
+
+// Déjà connecté : on ne redemande pas les identifiants.
+api.me().then(result => { if (result?.user) location.replace(nextUrl()); }).catch(() => {});
+
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  error.hidden = true;
+  submit.disabled = true;
+  status.innerHTML = '<span class="spinner"></span>';
+  status.append('Connexion…');
+
+  try {
+    await api.login(form.email.value.trim(), form.password.value);
+    location.replace(nextUrl());
+  } catch (caught) {
+    status.textContent = '';
+    error.textContent = caught instanceof ApiError
+      ? caught.message
+      : 'Connexion impossible. Réessayez.';
+    error.hidden = false;
+    error.focus();
+    form.password.value = '';
+    submit.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

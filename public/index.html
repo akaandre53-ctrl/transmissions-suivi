@@ -1,20 +1,61 @@
 <!doctype html>
 <html lang="fr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Suivi quotidien</title><link rel="stylesheet" href="style.css"></head>
-<body><main>
-<header><p class="eyebrow">ACCOMPAGNEMENT À DOMICILE</p><h1>Suivi quotidien</h1><p class="intro">À remplir à la fin de chaque intervention.</p></header>
-<form id="form">
-<section><h2>1. Informations générales</h2><div class="grid"><label>Date du suivi *<input name="date" type="date" required></label><label>Personne accompagnée *<input name="personName" required placeholder="Nom et prénom"></label><label>Accompagnant(e) *<input name="caregiverName" required placeholder="Nom et prénom"></label><label>Moment du suivi<select name="period"><option>Matin</option><option>Après-midi</option><option>Soir</option><option>Journée complète</option></select></label></div><label>Description facultative<textarea name="generalDescription" placeholder="Contexte ou informations utiles"></textarea></label></section>
-<section><h2>2. État général et santé</h2><div class="grid"><label>État général *<select name="generalState" required><option value="">Choisir</option><option>Très bon</option><option>Bon</option><option>Moyen</option><option>Fatiguée</option><option>Préoccupant</option></select></label><label>Malaise ou problème particulier ? *<select name="healthIssue" required data-toggle="healthIssueDetails"><option value="">Choisir</option><option>Non</option><option>Oui</option></select></label><label>Douleur ou gêne ?<select name="pain" data-toggle="painDetails"><option>Non</option><option>Oui</option></select></label></div><label id="healthIssueDetails" class="conditional">Décrivez le malaise ou problème<textarea name="healthIssueDetails"></textarea></label><label id="painDetails" class="conditional">Précisez la douleur ou la gêne<textarea name="painDetails"></textarea></label><label>Autre observation<textarea name="healthObservation"></textarea></label></section>
-<section><h2>3. Médicaments</h2><div class="grid"><label>Médicaments prévus pris ? *<select name="medicationTaken" required><option value="">Choisir</option><option>Oui, tous</option><option>Partiellement</option><option>Non</option><option>Non concernés</option></select></label><label>Raison de la non-prise<select name="medicationReason"><option>Non concerné</option><option>Refus</option><option>Oubli</option><option>Absence du médicament</option><option>Effet indésirable</option><option>Autre</option></select></label></div><label>Médicament(s) non pris ou manquants<textarea name="medicationMissing"></textarea></label><label>Observation médicaments<textarea name="medicationObservation"></textarea></label></section>
-<section><h2>4. Alimentation et hydratation</h2><div class="grid"><label>Petit-déjeuner<select name="breakfastTaken"><option>Oui</option><option>Non</option><option>Non concerné</option></select></label><label>Déjeuner<select name="lunchTaken"><option>Oui</option><option>Non</option><option>Non concerné</option></select></label><label>Dîner<select name="dinnerTaken"><option>Oui</option><option>Non</option><option>Non concerné</option></select></label><label>Hydratation<select name="hydration"><option>Bonne</option><option>Correcte</option><option>Insuffisante</option><option>À surveiller</option></select></label></div><label>Petit-déjeuner : aliments ou boissons<textarea name="breakfastDetails"></textarea></label><label>Déjeuner : aliments consommés<textarea name="lunchDetails"></textarea></label><label>Dîner : aliments consommés<textarea name="dinnerDetails"></textarea></label><div class="grid"><label>Photo petit-déjeuner<input name="breakfastPhoto" type="file" accept="image/*"></label><label>Photo déjeuner<input name="lunchPhoto" type="file" accept="image/*"></label><label>Photo dîner<input name="dinnerPhoto" type="file" accept="image/*"></label></div><label>Observation alimentation / hydratation<textarea name="nutritionObservation"></textarea></label></section>
-<section><h2>3. Constantes</h2><div class="grid"><label>TA bras gauche matin<input name="bpLeftMorning" placeholder="12 / 8"></label><label>TA bras droit matin<input name="bpRightMorning" placeholder="12 / 8"></label><label>Pouls matin<input name="pulseMorning" type="number" min="0" inputmode="numeric" placeholder="bpm"></label><label>Glycémie matin<input name="glucoseMorning" type="number" min="0" step="0.01" inputmode="decimal" placeholder="g/L"></label><label>TA bras gauche soir<input name="bpLeftEvening" placeholder="12 / 8"></label><label>TA bras droit soir<input name="bpRightEvening" placeholder="12 / 8"></label><label>Pouls soir<input name="pulseEvening" type="number" min="0" inputmode="numeric" placeholder="bpm"></label><label>Glycémie soir<input name="glucoseEvening" type="number" min="0" step="0.01" inputmode="decimal" placeholder="g/L"></label><label>Poids<input name="weight" type="number" min="0" step="0.1" inputmode="decimal" placeholder="kg"></label></div></section>
-<section><h2>5. Activités et mobilité</h2><div class="grid"><label>Déplacement ou marche ?<select name="mobility"><option>Oui, sans difficulté</option><option>Oui, avec aide</option><option>Non</option><option>Repos recommandé</option></select></label><label>Ressenti après activité<select name="activityFeeling"><option>Bien</option><option>Fatiguée</option><option>Essoufflée</option><option>Douleur</option><option>Non concerné</option></select></label></div><label>Activités réalisées<textarea name="activities"></textarea></label><label>Observation mobilité<textarea name="mobilityObservation"></textarea></label></section>
-<section><h2>6. Hygiène et soins corporels</h2><label>Soins réalisés<textarea name="carePerformed" placeholder="Toilette, habillage, coiffure, soins..." ></textarea></label><div class="grid"><label>Soin prévu non réalisé ?<select name="careNotDone" data-toggle="careNotDoneDetails"><option>Non</option><option>Oui</option></select></label></div><label id="careNotDoneDetails" class="conditional">Soin non réalisé et raison<textarea name="careNotDoneDetails"></textarea></label></section>
-<section><h2>7. Repos et bien-être</h2><div class="grid"><label>Repos suffisant ?<select name="rest"><option>Oui</option><option>Partiellement</option><option>Non</option><option>Non concerné</option></select></label><label>Humeur / état émotionnel<select name="mood"><option>Sereine</option><option>Bonne humeur</option><option>Tristesse</option><option>Anxiété</option><option>Irritabilité</option><option>Fatigue</option></select></label></div><label>Observation repos, sommeil ou bien-être<textarea name="wellbeingObservation"></textarea></label></section>
-<section><h2>8. Achats et dépenses</h2><div class="grid"><label>Une dépense a-t-elle eu lieu ? *<select name="hasExpense" required data-toggle="expenseDetails"><option value="">Choisir</option><option>Non</option><option>Oui</option></select></label></div><div id="expenseDetails" class="conditional"><div class="grid"><label>Montant (FCFA)<input name="expenseAmount" type="number" min="0" step="1" inputmode="numeric"></label><label>Achat autorisé ou prévu ?<select name="expenseAuthorized"><option>Oui</option><option>Non</option><option>À vérifier</option></select></label><label>Preuve d’achat disponible ?<select name="receiptAvailable"><option>Oui</option><option>Non</option></select></label></div><label>Produit ou service acheté<input name="expenseItem"></label><label>Commentaire sur l’achat<textarea name="expenseComment"></textarea></label><label>Photo du reçu<input name="receiptPhoto" type="file" accept="image/*"></label></div></section>
-<section><h2>9. Événements et points d’attention</h2><div class="grid"><label>Événement particulier ? *<select name="hasEvent" required data-toggle="eventDetails"><option value="">Choisir</option><option>Non</option><option>Oui</option></select></label></div><div id="eventDetails" class="conditional"><label>Décrivez l’événement<textarea name="eventDescription"></textarea></label><div class="grid"><label>Niveau d’attention<select name="attentionLevel"><option>Information</option><option>À surveiller</option><option>Important</option><option>Urgent</option></select></label><label>Action nécessaire<input name="requiredAction"></label></div></div></section>
-<section><h2>10. Bilan de la journée</h2><label>Résumé général *<textarea name="daySummary" required placeholder="La journée s'est globalement bien déroulée..."></textarea></label><label>Autres remarques<textarea name="finalNotes"></textarea></label><label>Autres photos de la journée<input name="otherPhotos" type="file" accept="image/*" multiple><small>5 images maximum au total, photos des repas et reçu compris.</small></label></section>
-<section><h2>Partage</h2><label>Numéro WhatsApp du destinataire *<input name="recipientPhone" type="tel" inputmode="tel" required placeholder="+225 07 00 00 00 00"><small>Le numéro est mémorisé uniquement dans ce navigateur.</small></label></section>
-<button type="submit">Enregistrer et partager le PDF</button><p id="status" role="status" aria-live="polite"></p><p class="note">Le PDF sera structuré par catégorie. Le partage du téléphone proposera le PDF et un message de politesse.</p>
-</form></main><script src="app.js"></script></body></html>
+<head>
+  <meta charset="utf-8">
+  <!-- Pas de maximum-scale ni user-scalable=no : bloquer le zoom rend
+       l'application inutilisable pour une personne malvoyante. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0F6B57">
+  <meta name="description" content="Saisie de la transmission quotidienne de suivi à domicile.">
+  <title>Transmission du jour</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <p class="topbar__title">Transmission du jour<span id="user-name">…</span></p>
+    <a class="btn btn--quiet" href="/historique.html">Historique</a>
+    <button type="button" class="btn btn--quiet" id="logout">Quitter</button>
+  </div>
+</header>
+
+<main class="shell">
+  <div id="loading" class="empty">
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Chargement du formulaire…</p>
+  </div>
+
+  <div id="app" hidden>
+    <div class="progress" id="progress">
+      <div class="progress__meta">
+        <span class="progress__step" id="progress-step">Étape 1 sur 7</span>
+        <span id="progress-title">Général et santé</span>
+      </div>
+      <div class="progress__track" role="progressbar" aria-label="Progression du formulaire"
+           aria-valuemin="1" aria-valuemax="7" aria-valuenow="1">
+        <div class="progress__bar" id="progress-bar" style="width:14%"></div>
+      </div>
+    </div>
+
+    <!-- Récapitulatif d'erreurs : focusable, annoncé, et chaque ligne renvoie
+         au champ concerné. -->
+    <div class="alert alert--error" id="error-summary" role="alert" tabindex="-1" hidden></div>
+
+    <form id="steps" novalidate></form>
+
+    <div id="done" tabindex="-1" hidden></div>
+
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <div class="actions" id="actions">
+      <button type="button" class="btn btn--quiet" id="back" hidden>Retour</button>
+      <button type="button" class="btn btn--primary" id="next">Continuer</button>
+      <button type="button" class="btn btn--primary" id="submit" hidden>Enregistrer la transmission</button>
+    </div>
+  </div>
+</main>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
