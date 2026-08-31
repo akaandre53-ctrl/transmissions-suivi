@@ -24,6 +24,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 const EMAIL = `controle-${Date.now()}@controle.local`;
 const PASSWORD = 'controle-integration-2026';
 const REF = `controle${Date.now()}`;
+const MARKER = 'CONTROLE TECHNIQUE';
 
 let ok = 0;
 let ko = 0;
@@ -56,6 +57,54 @@ const call = async (path, options = {}) => {
 let userId = null;
 let transmissionId = null;
 
+/** Retire de la feuille les lignes portant le marqueur de contrôle. */
+async function purgeSheetRows(marker, report) {
+  const { config } = await import('../src/config.js');
+  const { isSheetsConfigured } = await import('../src/config.js');
+  if (!isSheetsConfigured()) return;
+
+  try {
+    const { google } = await import('googleapis');
+    const raw = String(config.sheets.credentials).trim();
+    const auth = new google.auth.GoogleAuth({
+      ...(raw.startsWith('{') ? { credentials: JSON.parse(raw) } : { keyFile: raw }),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    const sheets = google.sheets({ version: 'v4', auth });
+    const id = config.sheets.spreadsheetId;
+    const tab = config.sheets.tabName;
+
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+    const sheetId = meta.data.sheets.find(s => s.properties.title === tab)?.properties.sheetId;
+    if (sheetId === undefined) return;
+
+    const got = await sheets.spreadsheets.values.get({ spreadsheetId: id, range: `${tab}!A:BZ` });
+    const rows = got.data.values || [];
+    // De bas en haut : supprimer par le haut décalerait les indices suivants.
+    const targets = rows
+      .map((row, index) => [row.join(' '), index])
+      .filter(([text, index]) => index > 0 && text.includes(marker))
+      .map(([, index]) => index)
+      .reverse();
+
+    for (const index of targets) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: id,
+        requestBody: {
+          requests: [{
+            deleteDimension: {
+              range: { sheetId, dimension: 'ROWS', startIndex: index, endIndex: index + 1 }
+            }
+          }]
+        }
+      });
+    }
+    report('feuille nettoyée', true, `${targets.length} ligne(s) de contrôle retirée(s)`);
+  } catch (error) {
+    report('feuille nettoyée', false, error.message);
+  }
+}
+
 try {
   console.log('\nPool limité à 1 connexion (conditions de production)\n');
 
@@ -84,7 +133,7 @@ try {
   console.log('\nEnregistrement');
   const values = {
     date: new Date().toISOString().slice(0, 10),
-    personName: 'CONTROLE TECHNIQUE',
+    personName: MARKER,
     caregiverName: 'Compte de contrôle',
     period: 'Journée complète',
     generalState: 'Bon',
@@ -141,6 +190,11 @@ try {
   ).catch(() => ({ rows: [{ u: -1, t: -1, i: -1 }] }));
   const l = left.rows[0];
   check('base nettoyée', l.u === 0 && l.t === 0 && l.i === 0, `${l.u} compte, ${l.t} transmission, ${l.i} photo`);
+
+  // Le miroir a pu recopier la transmission de contrôle dans la vraie feuille.
+  // La nettoyer aussi : sans cela, chaque exécution laissait une ligne de plus
+  // dans le tableau que consulte la famille.
+  await purgeSheetRows(MARKER, check);
 
   server.close();
   await closePool();

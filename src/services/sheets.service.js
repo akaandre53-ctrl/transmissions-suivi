@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { google } from 'googleapis';
 import { config, isSheetsConfigured } from '../config.js';
 import { DATA_FIELDS, SHEET_HEADER } from '../domain/schema.js';
@@ -14,6 +15,17 @@ function getSheets() {
   }
   // La variable contient soit le JSON du compte de service (déploiement),
   // soit un chemin vers le fichier de clé (poste local).
+  //
+  // Un chemin ne fonctionne qu'en local : en hébergement serverless il n'y a
+  // pas de fichier de clé à lire. Sans ce contrôle, l'échec remontait sous la
+  // forme d'un ENOENT opaque au fond d'une trace googleapis.
+  if (!raw.startsWith('{') && !existsSync(raw)) {
+    throw new Error(
+      `Clé Google introuvable au chemin « ${raw} ». En production, ` +
+      'GOOGLE_APPLICATION_CREDENTIALS doit contenir le JSON complet de la clé, ' +
+      'pas un chemin de fichier.'
+    );
+  }
   const auth = new google.auth.GoogleAuth({
     ...(raw.startsWith('{') ? { credentials: JSON.parse(raw) } : { keyFile: raw }),
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
@@ -69,7 +81,11 @@ function toRow(transmission, photoCount) {
  */
 export async function mirrorToSheet(transmission, photoCount = 0) {
   if (!isSheetsConfigured()) {
-    return { ok: false, status: 'pending', reason: 'non_configuré' };
+    // « skipped » et non « pending » : rien n'est en attente, la recopie n'est
+    // simplement pas demandée. Renvoyer « pending » laissait croire à un retard
+    // passager alors qu'il manque une variable d'environnement — et contredisait
+    // le statut réellement enregistré en base.
+    return { ok: false, status: 'skipped', reason: 'non_configuré' };
   }
   try {
     const sheets = getSheets();
