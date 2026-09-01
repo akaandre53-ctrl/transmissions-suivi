@@ -2,9 +2,9 @@
  * Client HTTP.
  *
  * Toute la robustesse tient dans readJson() : l'ancienne version appelait
- * response.json() sans filet, donc la moindre réponse non-JSON — page d'erreur
+ * response.json() sans filet, donc la moindre réponse non-JSON, page d'erreur
  * 413 quand les photos dépassaient la limite, 504 de la passerelle, page de
- * maintenance — produisait un « Unexpected token < in JSON » incompréhensible
+ * maintenance, produisait un « Unexpected token < in JSON » incompréhensible
  * pour l'aidante. Ici, chaque cas devient un message en français.
  */
 
@@ -71,12 +71,12 @@ export async function request(path, { method = 'GET', body, signal, timeoutMs = 
   } catch (error) {
     if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
       throw new ApiError(
-        'La connexion a expiré. Vérifiez votre réseau — vos données restent enregistrées sur cet appareil.',
+        'La connexion a expiré. Vérifiez votre réseau, vos données restent enregistrées sur cet appareil.',
         { code: 'timeout' }
       );
     }
     throw new ApiError(
-      'Impossible de joindre le serveur. Vérifiez votre connexion — rien n’est perdu, réessayez.',
+      'Impossible de joindre le serveur. Vérifiez votre connexion, rien n’est perdu, réessayez.',
       { code: 'offline' }
     );
   } finally {

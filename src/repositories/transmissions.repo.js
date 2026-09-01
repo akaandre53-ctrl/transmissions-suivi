@@ -7,7 +7,7 @@ const LIST_COLUMNS = `
 
 /**
  * Insertion idempotente : deux envois portant la même `client_ref` ne créent
- * qu'une ligne. Le second récupère la première — c'est ce qui empêche les
+ * qu'une ligne. Le second récupère la première, c'est ce qui empêche les
  * doublons quand le réseau lâche après l'écriture mais avant la réponse.
  *
  * @returns {{ row: object, created: boolean }}
@@ -19,7 +19,7 @@ export async function insertIdempotent(
   // `client` est obligatoire quand l'appel a lieu dans une transaction : celle-ci
   // détient déjà une connexion, et le pool n'en compte qu'une en environnement
   // serverless. Repasser par le pool attendrait une connexion que la transaction
-  // ne libérera qu'après cet appel — un interblocage jusqu'à expiration.
+  // ne libérera qu'après cet appel, un interblocage jusqu'à expiration.
   const run = client ? client.query.bind(client) : query;
 
   const { rows } = await run(

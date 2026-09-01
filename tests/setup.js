@@ -5,7 +5,7 @@
  * n'écrase jamais une variable déjà définie : le `.env` du poste de
  * développement est donc ignoré, et la suite de tests ne peut pas atteindre la
  * base réelle. Sans cette précaution, `npm test` enverrait de vraies requêtes
- * — y compris des tentatives de connexion — vers la base de production.
+ *, y compris des tentatives de connexion, vers la base de production.
  *
  * Le port 1 refuse immédiatement, ce qui garde les tests rapides plutôt que
  * de les faire attendre l'expiration d'un délai réseau.

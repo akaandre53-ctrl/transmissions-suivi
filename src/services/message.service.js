@@ -12,7 +12,7 @@ const formatValue = (field, value) => {
  * Construit le résumé lisible, dérivé du schéma.
  *
  * Les sections vides sont omises : sur WhatsApp, une liste de « Non renseigné »
- * noie l'information utile. La section « Partage » est exclue — le numéro du
+ * noie l'information utile. La section « Partage » est exclue, le numéro du
  * destinataire n'a pas à figurer dans le message qu'il reçoit.
  */
 export function buildSummary(values, { photoCount = 0 } = {}) {

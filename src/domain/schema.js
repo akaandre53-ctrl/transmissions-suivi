@@ -45,14 +45,14 @@ export const SECTIONS = [
     title: 'Constantes',
     hint: 'Laissez vide ce qui n’a pas été mesuré.',
     fields: [
-      { name: 'bpLeftMorning', label: 'Tension bras gauche — matin', type: 'text', placeholder: '12 / 8' },
-      { name: 'bpRightMorning', label: 'Tension bras droit — matin', type: 'text', placeholder: '12 / 8' },
-      { name: 'pulseMorning', label: 'Pouls — matin', type: 'number', unit: 'bpm', min: 20, max: 250, inputmode: 'numeric' },
-      { name: 'glucoseMorning', label: 'Glycémie — matin', type: 'number', unit: 'g/L', min: 0, max: 10, step: 0.01, inputmode: 'decimal' },
-      { name: 'bpLeftEvening', label: 'Tension bras gauche — soir', type: 'text', placeholder: '12 / 8' },
-      { name: 'bpRightEvening', label: 'Tension bras droit — soir', type: 'text', placeholder: '12 / 8' },
-      { name: 'pulseEvening', label: 'Pouls — soir', type: 'number', unit: 'bpm', min: 20, max: 250, inputmode: 'numeric' },
-      { name: 'glucoseEvening', label: 'Glycémie — soir', type: 'number', unit: 'g/L', min: 0, max: 10, step: 0.01, inputmode: 'decimal' },
+      { name: 'bpLeftMorning', label: 'Tension bras gauche (matin)', type: 'text', placeholder: '12 / 8' },
+      { name: 'bpRightMorning', label: 'Tension bras droit (matin)', type: 'text', placeholder: '12 / 8' },
+      { name: 'pulseMorning', label: 'Pouls (matin)', type: 'number', unit: 'bpm', min: 20, max: 250, inputmode: 'numeric' },
+      { name: 'glucoseMorning', label: 'Glycémie (matin)', type: 'number', unit: 'g/L', min: 0, max: 10, step: 0.01, inputmode: 'decimal' },
+      { name: 'bpLeftEvening', label: 'Tension bras gauche (soir)', type: 'text', placeholder: '12 / 8' },
+      { name: 'bpRightEvening', label: 'Tension bras droit (soir)', type: 'text', placeholder: '12 / 8' },
+      { name: 'pulseEvening', label: 'Pouls (soir)', type: 'number', unit: 'bpm', min: 20, max: 250, inputmode: 'numeric' },
+      { name: 'glucoseEvening', label: 'Glycémie (soir)', type: 'number', unit: 'g/L', min: 0, max: 10, step: 0.01, inputmode: 'decimal' },
       { name: 'weight', label: 'Poids', type: 'number', unit: 'kg', min: 20, max: 300, step: 0.1, inputmode: 'decimal' }
     ]
   },

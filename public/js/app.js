@@ -462,8 +462,8 @@ async function submit() {
     });
 
     rememberPhone(values.recipientPhone.replace(/[\s().-]/g, ''));
-    // À partir d'ici l'enregistrement est acquis. Tout ce qui suit — PDF,
-    // WhatsApp — peut échouer sans remettre les données en cause.
+    // À partir d'ici l'enregistrement est acquis. Tout ce qui suit, PDF,
+    // WhatsApp, peut échouer sans remettre les données en cause.
     showDone(result, values);
   } catch (error) {
     state.submitting = false;

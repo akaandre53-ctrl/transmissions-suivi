@@ -15,7 +15,7 @@ export function requireAuth(req, _res, next) {
   next();
 }
 
-/** requireRole('aidant', 'admin') — l'administrateur a toujours accès. */
+/** requireRole('aidant', 'admin'), l'administrateur a toujours accès. */
 export function requireRole(...roles) {
   const allowed = new Set([...roles, 'admin']);
   return (req, _res, next) => {

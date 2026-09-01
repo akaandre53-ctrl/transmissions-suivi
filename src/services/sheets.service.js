@@ -76,14 +76,14 @@ function toRow(transmission, photoCount) {
  * Recopie une transmission dans la feuille.
  *
  * Cette fonction ne lève jamais : elle met à jour le statut de la ligne et
- * laisse la file de reprise faire le reste. C'est le point clé de la refonte —
+ * laisse la file de reprise faire le reste. C'est le point clé de la refonte 
  * Google Sheets ne peut plus faire échouer un enregistrement.
  */
 export async function mirrorToSheet(transmission, photoCount = 0) {
   if (!isSheetsConfigured()) {
     // « skipped » et non « pending » : rien n'est en attente, la recopie n'est
     // simplement pas demandée. Renvoyer « pending » laissait croire à un retard
-    // passager alors qu'il manque une variable d'environnement — et contredisait
+    // passager alors qu'il manque une variable d'environnement, et contredisait
     // le statut réellement enregistré en base.
     return { ok: false, status: 'skipped', reason: 'non_configuré' };
   }

@@ -17,7 +17,7 @@ export const normalizePhone = value => clean(value).replace(/[\s().-]/g, '');
  * empêche à la fois les données fantômes en base et les blocages sur un champ
  * requis mais invisible.
  *
- * Renvoie { values, errors } — `errors` est une liste { field, message }.
+ * Renvoie { values, errors }, `errors` est une liste { field, message }.
  */
 export function validateTransmission(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {

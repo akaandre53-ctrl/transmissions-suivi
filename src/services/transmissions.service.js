@@ -13,7 +13,7 @@ import { mirrorToSheet } from './sheets.service.js';
  * Enregistre une transmission.
  *
  * Ordre des opérations, et pourquoi il compte :
- *   1. valider  — rien n'est écrit tant que la saisie n'est pas correcte ;
+ *   1. valider, rien n'est écrit tant que la saisie n'est pas correcte ;
  *   2. écrire en base, de façon idempotente et transactionnelle avec le
  *      rattachement des photos ;
  *   3. recopier vers Sheets, sans jamais pouvoir faire échouer l'étape 2.
@@ -21,7 +21,7 @@ import { mirrorToSheet } from './sheets.service.js';
  * Le PDF n'est plus produit ici. Il est rendu à la demande depuis la ligne
  * enregistrée, via getPdf(). L'ancien enchaînement « écrire dans Sheets puis
  * fabriquer le PDF » laissait une ligne orpheline dans la feuille dès que la
- * génération échouait, et l'aidant·e renvoyait le formulaire — d'où les doublons.
+ * génération échouait, et l'aidant·e renvoyait le formulaire, d'où les doublons.
  */
 export async function submitTransmission({ user, payload }) {
   const clientRef = validateClientRef(payload?.clientRef);

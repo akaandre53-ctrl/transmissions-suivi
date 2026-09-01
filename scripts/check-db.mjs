@@ -29,7 +29,7 @@ const MARKER = 'CONTROLE TECHNIQUE';
 let ok = 0;
 let ko = 0;
 const check = (label, condition, detail = '') => {
-  console.log(`  ${condition ? 'OK   ' : 'ECHEC'} ${label}${detail ? ' — ' + detail : ''}`);
+  console.log(`  ${condition ? 'OK   ' : 'ECHEC'} ${label}${detail ? ' : ' + detail : ''}`);
   condition ? ok++ : ko++;
 };
 

@@ -6,7 +6,7 @@ import { createApp } from '../src/app.js';
  * Tests du contrat HTTP, sans base de données.
  *
  * Ils vérifient surtout la garantie centrale de la refonte : une requête vers
- * /api reçoit TOUJOURS du JSON. C'est ce qui manquait — le navigateur recevait
+ * /api reçoit TOUJOURS du JSON. C'est ce qui manquait, le navigateur recevait
  * une page HTML d'erreur et échouait sur response.json() avec un message
  * incompréhensible pour l'utilisatrice.
  */

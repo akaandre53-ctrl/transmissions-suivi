@@ -19,7 +19,7 @@ const clean = value => String(value ?? '').trim();
  *
  * @param {object} transmission  ligne `transmissions` (data, summary, entry_date…)
  * @param {Array}  images        [{ category, mime_type, content: Buffer }]
- * @param {object} options       { compress } — compress:false sert aux tests,
+ * @param {object} options       { compress }, compress:false sert aux tests,
  *                               qui doivent pouvoir relire le flux de texte.
  */
 export function renderTransmissionPdf(transmission, images = [], { compress = true } = {}) {
@@ -32,7 +32,7 @@ export function renderTransmissionPdf(transmission, images = [], { compress = tr
       info: {
         Title: `Transmission du ${clean(values.date) || transmission.entry_date}`,
         Author: clean(values.caregiverName) || 'Accompagnant(e)',
-        Subject: `Suivi quotidien — ${clean(values.personName) || ''}`.trim()
+        Subject: `Suivi quotidien : ${clean(values.personName) || ''}`.trim()
       }
     });
 

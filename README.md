@@ -1,4 +1,4 @@
-# Transmission — suivi quotidien à domicile
+# Transmission : suivi quotidien à domicile
 
 Application de saisie de la transmission quotidienne d'une personne accompagnée.
 L'aidant·e remplit le formulaire au fil de la journée, l'enregistre, récupère un
@@ -15,7 +15,7 @@ reste un geste manuel.
 
 ```
 src/
-  domain/schema.js      Source unique des champs — pilote le formulaire,
+  domain/schema.js      Source unique des champs, pilote le formulaire,
                         la validation, le PDF, le message et l'en-tête Sheets
   domain/validate.js    Validation serveur, effacement des champs masqués
   auth/                 Mots de passe (scrypt), sessions en base, rôles, CSRF
@@ -141,7 +141,7 @@ en attente, purge les sessions expirées et supprime les photos jamais validées
 
 ## Utilisation quotidienne
 
-1. Ouvrez l'application et connectez-vous — la session dure 30 jours.
+1. Ouvrez l'application et connectez-vous, la session dure 30 jours.
 2. Remplissez les 7 étapes. **La saisie est enregistrée sur l'appareil à chaque
    frappe** : vous pouvez fermer l'onglet, verrouiller le téléphone et reprendre
    plus tard dans la journée.
@@ -163,15 +163,15 @@ npm test
 
 44 tests hors-ligne : schéma, validation, résumé, génération PDF, et contrat HTTP
 (authentification, CSRF, format des réponses d'erreur). Ils ne touchent jamais la
-base — `tests/setup.js` fixe `DATABASE_URL` sur un port fermé.
+base, `tests/setup.js` fixe `DATABASE_URL` sur un port fermé.
 
 ```bash
 npm run check:db
 ```
 
 Contrôle d'intégration contre la vraie base, **à lancer avant chaque mise en
-production**. Il déroule le parcours complet — connexion, photo, enregistrement,
-idempotence, PDF, cloisonnement — puis efface ce qu'il a créé.
+production**. Il déroule le parcours complet, connexion, photo, enregistrement,
+idempotence, PDF, cloisonnement, puis efface ce qu'il a créé.
 
 Il force le pool à **une seule connexion**, comme en environnement serverless.
 Cette contrainte n'est pas cosmétique : elle a révélé un interblocage invisible

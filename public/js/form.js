@@ -3,7 +3,7 @@
  *
  * Le formulaire n'est plus écrit en dur dans le HTML. Front et serveur lisent
  * la même définition de champs, donc un nom de champ ne peut plus diverger
- * entre les deux — c'était une source de bugs silencieux (valeur saisie,
+ * entre les deux, c'était une source de bugs silencieux (valeur saisie,
  * jamais enregistrée).
  */
 

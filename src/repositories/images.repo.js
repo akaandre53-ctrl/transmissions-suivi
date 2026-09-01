@@ -10,7 +10,7 @@ export async function insert({ ownerId, clientRef, fieldName, category, filename
   return rows[0];
 }
 
-/** Métadonnées sans le contenu binaire — pour les listes et les vérifications. */
+/** Métadonnées sans le contenu binaire, pour les listes et les vérifications. */
 export async function findMetaByIds(ids, ownerId) {
   if (!ids.length) return [];
   const { rows } = await query(
