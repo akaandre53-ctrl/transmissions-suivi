@@ -18,6 +18,7 @@ src/
   domain/schema.js      Source unique des champs, pilote le formulaire,
                         la validation, le PDF, le message et l'en-tête Sheets
   domain/validate.js    Validation serveur, effacement des champs masqués
+  domain/access.js      Qui peut lire et saisir quoi, en fonctions pures
   auth/                 Mots de passe (scrypt), sessions en base, rôles, CSRF
   db/                   Pool Postgres, migrations SQL
   repositories/         Accès aux tables, sans logique métier
@@ -27,9 +28,11 @@ src/
 public/
   index.html            Formulaire en 7 étapes
   login.html            Connexion
-  historique.html       Consultation et retéléchargement des PDF
+  historique.html       Frise des journées, filtre par personne, PDF
+  admin.html            Personnes accompagnées, comptes et accès
   js/                   Modules ES natifs, sans dépendance ni build
-tests/                  Tests de domaine et de contrat HTTP
+tests/                  Tests de domaine, d'accès et de contrat HTTP
+scripts/check-db.mjs    Contrôle d'intégration contre la vraie base
 ```
 
 **Postgres est la source de vérité. Google Sheets en est un miroir** : la
@@ -77,13 +80,26 @@ npm run create-user -- --email vous@exemple.ci --nom "Votre Nom" --role admin
 Le mot de passe est demandé sans être affiché. Sans terminal interactif, un mot
 de passe est généré et affiché une seule fois.
 
-Les trois rôles :
+Les autres comptes se créent ensuite depuis la page **Administration**.
 
-| Rôle      | Peut faire                                                |
-|-----------|-----------------------------------------------------------|
-| `aidant`  | Saisir une transmission, consulter les siennes            |
-| `famille` | Consulter toutes les transmissions et télécharger les PDF |
-| `admin`   | Tout, plus la gestion des comptes                         |
+### Qui voit quoi
+
+Chaque transmission est rattachée à une **personne accompagnée** (une fiche),
+et chaque compte aux personnes qu'il suit. Les règles sont dans
+`src/domain/access.js` et appliquées en SQL pour les listes :
+
+| Rôle      | Saisit pour                        | Voit                                          |
+|-----------|------------------------------------|-----------------------------------------------|
+| `aidant`  | les personnes qui lui sont confiées | les transmissions qu'il a saisies             |
+| `famille` | personne                           | uniquement les personnes qui lui sont rattachées |
+| `admin`   | tout le monde                      | tout, et gère fiches, comptes et accès        |
+
+**Un compte famille sans rattachement ne voit rien.** C'est volontaire : un accès
+oublié se corrige en un clic, un accès accordé à tort expose des données de
+santé. Les photos et les PDF suivent la même règle que leur transmission.
+
+Dans le formulaire, la personne se choisit dans une liste au lieu d'être tapée :
+un nom mal orthographié ne peut plus créer une personne fantôme.
 
 ### 4. Google Sheets (facultatif)
 
@@ -134,6 +150,13 @@ Les migrations ne tournent pas toutes seules au déploiement. Lancez
 `npm run migrate` depuis votre poste, la variable `DATABASE_URL` pointant sur la
 base de production.
 
+**Ordre à respecter quand une migration change une colonne utilisée en
+production** : appliquer d'abord la migration additive (le code en ligne
+continue de fonctionner), déployer, puis appliquer la migration qui rend la
+colonne obligatoire. C'est le cas de `002_beneficiaries` puis
+`003_beneficiary_required` : la seconde rattrape les transmissions enregistrées
+par l'ancien code pendant le déploiement.
+
 `vercel.json` déclare une tâche quotidienne à 3 h qui rejoue les recopies Sheets
 en attente, purge les sessions expirées et supprime les photos jamais validées.
 
@@ -161,7 +184,8 @@ la référence du brouillon empêche la création d'une deuxième ligne.
 npm test
 ```
 
-44 tests hors-ligne : schéma, validation, résumé, génération PDF, et contrat HTTP
+59 tests hors ligne : schéma, validation, règles d'accès, résumé, PDF (accents,
+mention sur chaque page, absence de page blanche) et contrat HTTP
 (authentification, CSRF, format des réponses d'erreur). Ils ne touchent jamais la
 base, `tests/setup.js` fixe `DATABASE_URL` sur un port fermé.
 
@@ -170,8 +194,10 @@ npm run check:db
 ```
 
 Contrôle d'intégration contre la vraie base, **à lancer avant chaque mise en
-production**. Il déroule le parcours complet, connexion, photo, enregistrement,
-idempotence, PDF, cloisonnement, puis efface ce qu'il a créé.
+production**. Il déroule le parcours complet (connexion, photo, enregistrement,
+idempotence, PDF) et éprouve le cloisonnement : deux familles, deux personnes,
+chacune doit rester aveugle aux transmissions, aux PDF et aux photos de l'autre.
+Il efface ensuite tout ce qu'il a créé, y compris dans la feuille Google.
 
 Il force le pool à **une seule connexion**, comme en environnement serverless.
 Cette contrainte n'est pas cosmétique : elle a révélé un interblocage invisible
@@ -193,3 +219,33 @@ contrôle.
 | Feuille Google modifiable par n'importe qui | Aucune authentification | Sessions, mots de passe hachés (scrypt), rôles, contrôle d'origine |
 | Limitation de débit inopérante | Compteur en mémoire, remis à zéro à chaque instance serverless | Compteur partagé en base |
 | Détails techniques renvoyés au client | `error.message` brut de l'API Google | Seuls les messages destinés à l'utilisateur sortent ; le reste est journalisé |
+| Historique partagé entre familles | Aucun lien entre un compte et la personne suivie : un compte famille voyait toutes les transmissions, photos comprises | Fiches « personne accompagnée », rattachement par compte, filtrage en SQL, contrôle sur le PDF et chaque photo |
+
+---
+
+## Identité visuelle
+
+Univers « soin et douceur » : fond crème, vert profond pour l’action, abricot
+pour l’attention, paysage de collines en en-tête. Titres en **Fraunces**, texte
+en **Nunito Sans**. Thème clair et sombre suivant le réglage du téléphone.
+
+Rapports de contraste mesurés dans le navigateur (seuil d’accessibilité : 4,5:1) :
+
+| Paire | Clair | Sombre |
+|---|---|---|
+| Texte principal sur carte | 14,8 | 13,4 |
+| Texte secondaire sur carte | 5,8 | 7,6 |
+| Unités et textes indicatifs | 4,75 | 4,5 |
+| Bouton principal | 7,8 | 9,2 |
+| Abricot sur fond d’en-tête | 5,8 | 9,2 |
+| Messages d’erreur | 5,7 | 7,5 |
+
+L’en-tête illustré a été contrôlé à 375, 820, 1024, 1280 et 1920 px : aucun
+élément du dessin ne chevauche le texte ni n’est rogné.
+
+### Mention « by Prime Advisors SB, Inc. »
+
+Elle apparaît en pied de chaque écran, mise en avant avec le logo sur la page
+de connexion, et en pied de chaque page du PDF, toujours cliquable vers
+https://www.primeadvisors-sb.com/. Le logo est servi par ce site : s’il ne
+répond pas, le nom en texte prend sa place.
