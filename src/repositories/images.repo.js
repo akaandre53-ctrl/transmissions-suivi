@@ -33,7 +33,7 @@ export async function findByTransmission(transmissionId) {
 
 export async function findOne(id) {
   const { rows } = await query(
-    'SELECT id, transmission_id, mime_type, filename, content FROM images WHERE id = $1',
+    'SELECT id, transmission_id, owner_id, mime_type, filename, content FROM images WHERE id = $1',
     [id]
   );
   return rows[0] || null;

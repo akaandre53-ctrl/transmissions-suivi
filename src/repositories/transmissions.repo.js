@@ -1,8 +1,15 @@
 import { query } from '../db/pool.js';
 
+// Quelques champs sont extraits du JSON pour la frise de l'historique, sans
+// faire transiter la transmission entière pour chaque carte.
 const LIST_COLUMNS = `
-  t.id, t.client_ref, t.entry_date, t.person_name, t.summary,
+  t.id, t.client_ref, t.entry_date, t.person_name, t.beneficiary_id, t.summary,
   t.created_at, t.sheet_status, t.sheet_synced_at,
+  t.data->>'period' AS period,
+  t.data->>'generalState' AS general_state,
+  t.data->>'hasEvent' AS has_event,
+  t.data->>'attentionLevel' AS attention_level,
+  (SELECT count(*)::int FROM images i WHERE i.transmission_id = t.id) AS photo_count,
   u.full_name AS author_name, u.id AS author_id`;
 
 /**
@@ -13,7 +20,7 @@ const LIST_COLUMNS = `
  * @returns {{ row: object, created: boolean }}
  */
 export async function insertIdempotent(
-  { clientRef, authorId, entryDate, personName, data, summary, sheetStatus },
+  { clientRef, authorId, beneficiaryId, entryDate, personName, data, summary, sheetStatus },
   client = null
 ) {
   // `client` est obligatoire quand l'appel a lieu dans une transaction : celle-ci
@@ -23,11 +30,12 @@ export async function insertIdempotent(
   const run = client ? client.query.bind(client) : query;
 
   const { rows } = await run(
-    `INSERT INTO transmissions (client_ref, author_id, entry_date, person_name, data, summary, sheet_status)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+    `INSERT INTO transmissions
+       (client_ref, author_id, beneficiary_id, entry_date, person_name, data, summary, sheet_status)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
      ON CONFLICT (client_ref) DO NOTHING
      RETURNING *`,
-    [clientRef, authorId, entryDate, personName, JSON.stringify(data), summary, sheetStatus]
+    [clientRef, authorId, beneficiaryId, entryDate, personName, JSON.stringify(data), summary, sheetStatus]
   );
   if (rows[0]) return { row: rows[0], created: true };
 
@@ -50,16 +58,36 @@ export async function findByIdWithAuthor(id) {
   return rows[0] || null;
 }
 
-export async function list({ limit = 30, before = null, authorId = null } = {}) {
-  const params = [Math.min(Math.max(limit, 1), 100)];
+/**
+ * Historique visible par un compte.
+ *
+ * Le filtre par rôle est appliqué EN SQL, jamais après coup en JavaScript :
+ * c'est la seule façon de garantir qu'une ligne non autorisée ne quitte pas la
+ * base, et que la pagination reste juste. Les règles sont celles de
+ * domain/access.js.
+ */
+export async function listVisible(user, { limit = 30, before = null, beneficiaryId = null } = {}) {
+  const params = [Math.min(Math.max(Number(limit) || 30, 1), 100)];
   const conditions = [];
+
+  if (user.role === 'aidant') {
+    params.push(user.id);
+    conditions.push(`t.author_id = $${params.length}`);
+  } else if (user.role === 'famille') {
+    params.push(user.id);
+    conditions.push(`t.beneficiary_id IN (
+      SELECT ub.beneficiary_id FROM user_beneficiaries ub WHERE ub.user_id = $${params.length})`);
+  } else if (user.role !== 'admin') {
+    return [];
+  }
+
+  if (beneficiaryId) {
+    params.push(beneficiaryId);
+    conditions.push(`t.beneficiary_id = $${params.length}`);
+  }
   if (before) {
     params.push(before);
     conditions.push(`t.created_at < $${params.length}`);
-  }
-  if (authorId) {
-    params.push(authorId);
-    conditions.push(`t.author_id = $${params.length}`);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const { rows } = await query(

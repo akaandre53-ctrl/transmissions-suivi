@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FAF6F0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121816" media="(prefers-color-scheme: dark)">
+  <title>Administration : Transmission</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="/">
+      <span class="brand__mark"><span data-icon="leaf"></span></span>
+      <span class="brand__name">Transmission</span>
+    </a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a class="nav__link" href="/" data-nav="saisie" data-roles="aidant admin"><span data-icon="notebook"></span>Saisie</a>
+      <a class="nav__link" href="/historique.html" data-nav="historique"><span data-icon="clock"></span>Historique</a>
+      <a class="nav__link" href="/admin.html" data-nav="admin" data-roles="admin" aria-label="Administration"><span data-icon="shield"></span>Admin<span class="nav__more">istration</span></a>
+    </nav>
+    <div class="account">
+      <span class="avatar" data-user-initials aria-hidden="true"></span>
+      <span class="account__text">
+        <span class="account__name" data-user-name></span>
+        <span class="account__role" data-user-role></span>
+      </span>
+      <button type="button" class="icon-btn" data-logout aria-label="Se déconnecter"><span data-icon="logout"></span></button>
+    </div>
+  </div>
+</header>
+
+<section class="hero hero--compact">
+  <div class="hero__art" data-landscape></div>
+  <div class="hero__inner shell shell--wide">
+    <p class="eyebrow"><span data-icon="shield"></span>Administration</p>
+    <h1 class="hero__title">Qui suit <em>qui</em></h1>
+    <p class="hero__meta"><span>Un compte famille ne voit que les personnes qui lui sont rattachées ici.</span></p>
+  </div>
+</section>
+
+<main id="contenu" class="shell shell--wide main lift">
+  <div class="alert alert--error" id="error" role="alert" tabindex="-1" hidden></div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+
+  <div class="admin-grid">
+    <section class="card" aria-labelledby="people-title">
+      <div class="card__head">
+        <span class="card__icon card__icon--accent"><span data-icon="heart"></span></span>
+        <div>
+          <h2 class="card__title" id="people-title">Personnes accompagnées</h2>
+          <p class="card__hint">Une fiche par personne suivie. Une fiche archivée n’est plus proposée à la saisie mais son historique reste consultable.</p>
+        </div>
+      </div>
+      <ul class="rows" id="people"></ul>
+      <form class="inline-form" id="add-person" novalidate>
+        <label class="visually-hidden" for="person-name">Nom de la personne accompagnée</label>
+        <input id="person-name" name="fullName" placeholder="Nom et prénom" autocomplete="off" required>
+        <button type="submit" class="btn btn--primary"><span data-icon="plus"></span>Ajouter</button>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="accounts-title">
+      <div class="card__head">
+        <span class="card__icon"><span data-icon="users"></span></span>
+        <div>
+          <h2 class="card__title" id="accounts-title">Comptes et accès</h2>
+          <p class="card__hint">Cochez les personnes que chaque compte peut suivre, puis enregistrez.</p>
+        </div>
+      </div>
+      <div id="accounts"></div>
+
+      <details class="disclosure account-card" style="margin-top:18px">
+        <summary class="row__title" style="display:flex;align-items:center;gap:10px">
+          <span data-icon="plus"></span>Créer un compte
+        </summary>
+        <form class="grid grid--pair" id="add-account" style="margin-top:16px" novalidate>
+          <div class="field">
+            <label class="field__label" for="account-name">Nom complet</label>
+            <input id="account-name" name="fullName" autocomplete="off" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="account-email">Adresse e-mail</label>
+            <input id="account-email" name="email" type="email" inputmode="email" autocapitalize="none" autocomplete="off" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="account-role">Rôle</label>
+            <select id="account-role" name="role">
+              <option value="aidant">Aidante : saisit les transmissions</option>
+              <option value="famille">Famille : consulte uniquement</option>
+              <option value="admin">Administration : tout, y compris cette page</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="account-password">Mot de passe provisoire</label>
+            <input id="account-password" name="password" autocomplete="new-password" spellcheck="false" required>
+            <p class="field__help">10 caractères minimum. <button type="button" class="btn btn--quiet btn--small" id="generate" style="padding:0 6px;min-height:0">Générer</button></p>
+          </div>
+          <div class="field field--wide">
+            <button type="submit" class="btn btn--primary"><span data-icon="check"></span>Créer le compte</button>
+          </div>
+        </form>
+      </details>
+    </section>
+  </div>
+</main>
+
+<footer class="credit">
+  <a class="credit__link" href="https://www.primeadvisors-sb.com/" target="_blank" rel="noopener">
+    by <strong>Prime Advisors SB, Inc.</strong><span class="visually-hidden"> (ouvre le site dans un nouvel onglet)</span>
+  </a>
+</footer>
+
+<script type="module" src="/js/admin.js"></script>
+</body>
+</html>

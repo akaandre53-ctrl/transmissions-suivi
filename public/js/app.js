@@ -1,9 +1,11 @@
 import { ApiError, api, fetchPdf } from './api.js';
-import { clearDraft, loadDraft, newClientRef, recallPhone, rememberPhone, saveDraft } from './draft.js';
+import { escapeHtml, firstName, setupChrome, todayLabel } from './chrome.js';
+import { createDraftStore } from './draft.js';
 import {
   clearAllErrors, clearFieldError, createField, isFieldActive,
   renderErrorSummary, showFieldError, validateFields
 } from './form.js';
+import { SECTION_ICONS, icon } from './icons.js';
 import { uploadPhoto } from './photos.js';
 
 /* Regroupement des sections en étapes. Douze écrans seraient trop nombreux ;
@@ -24,7 +26,9 @@ const state = {
   schema: null,
   byName: new Map(),
   fields: [],
-  draft: loadDraft(),
+  beneficiaries: [],
+  store: null,
+  draft: null,
   step: 0,
   submitting: false,
   user: null
@@ -36,49 +40,55 @@ const elements = {
   steps: $('#steps'),
   summary: $('#error-summary'),
   status: $('#status'),
-  progressBar: $('#progress-bar'),
-  progressStep: $('#progress-step'),
+  dots: $('#progress-dots'),
+  progress: $('#progress'),
+  progressCount: $('#progress-count'),
   progressTitle: $('#progress-title'),
   back: $('#back'),
   next: $('#next'),
   submit: $('#submit'),
   actions: $('#actions'),
   done: $('#done'),
-  userName: $('#user-name'),
-  logout: $('#logout')
+  noAccess: $('#no-access')
 };
 
 /* ------------------------------------------------------------- démarrage */
 
 init().catch(error => {
   elements.loading.innerHTML =
-    `<p class="alert alert--error">${escapeHtml(error.message || 'Chargement impossible.')}</p>`;
+    `<div class="alert alert--error"><p>${escapeHtml(error.message || 'Chargement impossible.')}</p></div>`;
 });
 
 async function init() {
-  const me = await api.me().catch(error => {
-    if (error instanceof ApiError && error.status === 401) return null;
-    throw error;
+  const user = await setupChrome({
+    page: 'saisie',
+    roles: ['aidant', 'admin'],
+    beforeLogout: confirmLogout
   });
-  if (!me?.user) {
-    location.replace(`/login.html?suite=${encodeURIComponent(location.pathname)}`);
-    return;
-  }
-  state.user = me.user;
-  elements.userName.textContent = me.user.fullName;
+  if (!user) return;
+  state.user = user;
+  state.store = createDraftStore(user);
+  state.draft = state.store.load();
 
-  if (me.user.role !== 'aidant' && me.user.role !== 'admin') {
-    // La famille consulte l'historique mais ne saisit pas de transmission.
-    location.replace('/historique.html');
-    return;
-  }
+  $('#greeting-name').textContent = firstName(user.fullName);
+  $('#today').textContent = todayLabel();
 
-  const schema = await api.schema();
+  const [schema, people] = await Promise.all([api.schema(), api.beneficiaries()]);
   state.schema = schema;
+  state.beneficiaries = people.beneficiaries;
   state.fields = schema.sections.flatMap(section =>
     section.fields.map(field => ({ ...field, sectionId: section.id }))
   );
   state.byName = new Map(state.fields.map(field => [field.name, field]));
+
+  elements.loading.hidden = true;
+
+  // Sans personne confiée, le formulaire ne peut pas aboutir : on le dit tout
+  // de suite plutôt qu'après sept étapes de saisie.
+  if (!state.beneficiaries.length) {
+    elements.noAccess.hidden = false;
+    return;
+  }
 
   renderSteps();
   hydrate();
@@ -86,13 +96,18 @@ async function init() {
 
   state.step = Math.min(state.draft.step || 0, STEPS.length - 1);
   goToStep(state.step, { focus: false });
-
-  elements.loading.hidden = true;
   elements.app.hidden = false;
 
-  if (Object.keys(state.draft.values).length > 3) {
-    setStatus('Brouillon du jour restauré.', 'saved');
-  }
+  if (state.store.hasContent()) setStatus('Votre saisie en cours a été retrouvée.', 'saved');
+}
+
+async function confirmLogout() {
+  if (!state.store?.hasContent()) return true;
+  const leave = window.confirm(
+    'Une saisie est en cours. Elle sera effacée de cet appareil si vous vous déconnectez. Continuer ?'
+  );
+  if (leave) state.store.clear();
+  return leave;
 }
 
 /* ------------------------------------------------------------------ rendu */
@@ -100,42 +115,57 @@ async function init() {
 function renderSteps() {
   const sections = new Map(state.schema.sections.map(section => [section.id, section]));
 
+  elements.dots.style.setProperty('--count', STEPS.length);
+  elements.dots.replaceChildren(...STEPS.map(() => document.createElement('li')));
+
   STEPS.forEach((step, index) => {
     const container = document.createElement('section');
     container.className = 'step';
     container.dataset.step = index;
     container.hidden = true;
-    container.setAttribute('aria-labelledby', `etape-${index}-titre`);
 
-    for (const sectionId of step.sections) {
+    step.sections.forEach((sectionId, position) => {
       const section = sections.get(sectionId);
-      if (!section) continue;
+      if (!section) return;
 
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card reveal';
 
       const head = document.createElement('div');
       head.className = 'card__head';
+
+      const badge = document.createElement('span');
+      badge.className = `card__icon${['events', 'expense'].includes(sectionId) ? ' card__icon--accent' : ''}`;
+      badge.append(icon(SECTION_ICONS[sectionId] || 'notebook'));
+
+      const titles = document.createElement('div');
       const heading = document.createElement('h2');
-      heading.id = `etape-${index}-titre`;
+      heading.className = 'card__title';
       heading.textContent = section.title;
-      head.append(heading);
+      // Le premier titre de l'étape reçoit le focus au changement d'étape.
+      if (position === 0) heading.tabIndex = -1;
+      titles.append(heading);
       if (section.hint) {
         const hint = document.createElement('p');
         hint.className = 'card__hint';
         hint.textContent = section.hint;
-        head.append(hint);
+        titles.append(hint);
       }
+
+      head.append(badge, titles);
       card.append(head);
 
       const grid = document.createElement('div');
       grid.className = 'grid grid--pair';
       for (const field of section.fields) {
-        grid.append(field.type === 'photo' ? createPhotoField(field) : createField(field));
+        grid.append(field.type === 'photo'
+          ? createPhotoField(field)
+          : createField(field, { beneficiaries: state.beneficiaries }));
       }
       card.append(grid);
       container.append(card);
-    }
+    });
+
     elements.steps.append(container);
   });
 }
@@ -166,29 +196,19 @@ function createPhotoField(field) {
 
   const drop = document.createElement('label');
   drop.className = 'photo-drop';
-  drop.append(icon('M12 5v14M5 12h14'), field.multiple ? 'Ajouter des photos' : 'Ajouter une photo');
+  drop.append(icon('camera'), field.multiple ? 'Ajouter des photos' : 'Ajouter une photo');
 
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
   if (field.multiple) input.multiple = true;
   input.dataset.photoInput = field.name;
+  input.setAttribute('aria-label', field.label);
   drop.append(input);
 
   photos.append(list, drop);
   wrapper.append(photos);
   return wrapper;
-}
-
-function icon(path) {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'icon');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  const element = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  element.setAttribute('d', path);
-  svg.append(element);
-  return svg;
 }
 
 /* ------------------------------------------------------------- hydratation */
@@ -197,12 +217,16 @@ function hydrate() {
   const values = state.draft.values;
 
   if (!values.date) values.date = new Date().toLocaleDateString('sv-SE');
-  if (!values.recipientPhone) values.recipientPhone = recallPhone();
+  if (!values.recipientPhone) values.recipientPhone = state.store.recallPhone();
   if (!values.caregiverName) values.caregiverName = state.user.fullName;
 
   for (const [name, value] of Object.entries(values)) {
     const control = elements.steps.querySelector(`[name="${CSS.escape(name)}"]`);
-    if (control) control.value = value;
+    if (!control) continue;
+    // Un ancien brouillon peut contenir un nom tapé à la main à la place d'un
+    // identifiant : on ne l'impose pas à la liste, qui garde sa valeur par défaut.
+    if (control.tagName === 'SELECT' && ![...control.options].some(option => option.value === value)) continue;
+    control.value = value;
   }
 
   for (const photo of state.draft.photos) appendPhoto(photo, { pending: false });
@@ -254,14 +278,13 @@ function bindEvents() {
   }, true);
 
   elements.steps.addEventListener('change', event => {
-    if (event.target.dataset.photoInput) return;
+    const name = event.target.dataset.photoInput;
+    if (name) {
+      handlePhotoSelection(event.target, name);
+      return;
+    }
     applyConditions();
     persist();
-  });
-
-  elements.steps.addEventListener('change', event => {
-    const name = event.target.dataset.photoInput;
-    if (name) handlePhotoSelection(event.target, name);
   });
 
   elements.steps.addEventListener('click', event => {
@@ -274,14 +297,10 @@ function bindEvents() {
     if (validateStep(state.step)) goToStep(state.step + 1);
   });
   elements.submit.addEventListener('click', submit);
-  elements.logout.addEventListener('click', async () => {
-    await api.logout().catch(() => {});
-    location.href = '/login.html';
-  });
 
   // Dernier filet : prévient avant de fermer un onglet avec une saisie en cours.
   window.addEventListener('beforeunload', event => {
-    if (state.submitting || Object.keys(state.draft.values).length < 4) return;
+    if (state.submitting || !state.store.hasContent()) return;
     event.preventDefault();
   });
 }
@@ -289,8 +308,8 @@ function bindEvents() {
 function persist() {
   state.draft.values = collectValues();
   state.draft.step = state.step;
-  saveDraft(state.draft);
-  setStatus('Brouillon enregistré sur cet appareil.', 'saved');
+  state.store.save(state.draft);
+  setStatus('Enregistré sur cet appareil.', 'saved');
 }
 
 /* ------------------------------------------------------------- navigation */
@@ -302,11 +321,15 @@ function goToStep(index, { focus = true } = {}) {
     step.hidden = Number(step.dataset.step) !== state.step;
   }
 
+  [...elements.dots.children].forEach((dot, position) => {
+    dot.dataset.state = position < state.step ? 'done' : position === state.step ? 'current' : 'todo';
+  });
+
   const human = state.step + 1;
-  elements.progressStep.textContent = `Étape ${human} sur ${STEPS.length}`;
+  elements.progressCount.textContent = `Étape ${human} sur ${STEPS.length}`;
   elements.progressTitle.textContent = STEPS[state.step].title;
-  elements.progressBar.style.width = `${(human / STEPS.length) * 100}%`;
-  elements.progressBar.parentElement.setAttribute('aria-valuenow', String(human));
+  elements.dots.setAttribute('aria-valuenow', String(human));
+  elements.dots.setAttribute('aria-valuetext', `Étape ${human} sur ${STEPS.length} : ${STEPS[state.step].title}`);
 
   elements.back.hidden = state.step === 0;
   elements.next.hidden = state.step === STEPS.length - 1;
@@ -314,11 +337,11 @@ function goToStep(index, { focus = true } = {}) {
 
   elements.summary.hidden = true;
   state.draft.step = state.step;
-  saveDraft(state.draft);
+  state.store.save(state.draft);
 
-  window.scrollTo({ top: 0, behavior: 'instant' });
   if (focus) {
-    elements.steps.querySelector(`[data-step="${state.step}"] h2`)?.focus?.();
+    elements.progress.scrollIntoView({ block: 'start', behavior: 'instant' });
+    elements.steps.querySelector(`[data-step="${state.step}"] h2[tabindex]`)?.focus({ preventScroll: true });
   }
 }
 
@@ -339,7 +362,7 @@ function validateStep(index) {
 function focusField(name) {
   const wrapper = elements.steps.querySelector(`.field[data-field="${CSS.escape(name)}"]`);
   const step = wrapper?.closest('.step');
-  if (step && Number(step.dataset.step) !== state.step) goToStep(Number(step.dataset.step));
+  if (step && Number(step.dataset.step) !== state.step) goToStep(Number(step.dataset.step), { focus: false });
   const control = wrapper?.querySelector('input, select, textarea');
   control?.focus();
   control?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -358,9 +381,7 @@ async function handlePhotoSelection(input, fieldName) {
     return;
   }
 
-  // Le contrôle du total se fait AVANT l'envoi. Auparavant la limite n'était
-  // appliquée que par input, donc on pouvait dépasser puis se faire refuser
-  // la transmission entière après avoir tout téléversé.
+  // Le contrôle du total se fait AVANT l'envoi, pas après avoir tout téléversé.
   for (const file of files.slice(0, remaining)) {
     const placeholder = appendPhoto(
       { id: `attente-${Math.random().toString(36).slice(2)}`, fieldName, filename: file.name },
@@ -368,10 +389,8 @@ async function handlePhotoSelection(input, fieldName) {
     );
     try {
       const photo = await uploadPhoto({ file, fieldName, clientRef: state.draft.clientRef });
-      state.draft.photos.push({
-        id: photo.id, fieldName, category: photo.category, filename: photo.filename
-      });
-      saveDraft(state.draft, { immediate: true });
+      state.draft.photos.push({ id: photo.id, fieldName, category: photo.category, filename: photo.filename });
+      state.store.save(state.draft, { immediate: true });
       placeholder.replaceWith(buildPhotoItem(photo, { pending: false }));
       setStatus('Photo ajoutée.', 'saved');
     } catch (error) {
@@ -401,35 +420,33 @@ function buildPhotoItem(photo, { pending }) {
   const image = document.createElement('img');
   image.alt = photo.category || photo.filename || 'Photo de la journée';
   image.loading = 'lazy';
-  image.src = photo.dataUrl || `/api/uploads/${photo.id}`;
+  if (photo.dataUrl || !pending) image.src = photo.dataUrl || `/api/uploads/${photo.id}`;
   item.append(image);
 
   if (pending) {
-    const state_ = document.createElement('span');
-    state_.className = 'photo__state';
-    state_.textContent = 'Envoi…';
-    item.append(state_);
+    const label = document.createElement('span');
+    label.className = 'photo__state';
+    label.textContent = 'Envoi…';
+    item.append(label);
   } else {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'photo__remove';
     remove.dataset.removePhoto = photo.id;
     remove.setAttribute('aria-label', `Retirer la photo ${photo.filename || ''}`.trim());
-    remove.append(icon('M18 6 6 18M6 6l12 12'));
+    remove.append(icon('close'));
     item.append(remove);
   }
   return item;
 }
 
 async function removePhoto(id) {
-  const item = elements.steps.querySelector(`[data-photo-id="${CSS.escape(id)}"]`);
-  item?.remove();
+  elements.steps.querySelector(`[data-photo-id="${CSS.escape(id)}"]`)?.remove();
   state.draft.photos = state.draft.photos.filter(photo => photo.id !== id);
-  saveDraft(state.draft, { immediate: true });
-  await api.deletePhoto(id).catch(() => {
-    // La photo disparaît de l'écran quoi qu'il arrive ; les orphelines sont
-    // purgées côté serveur par la tâche d'entretien.
-  });
+  state.store.save(state.draft, { immediate: true });
+  // La photo disparaît de l'écran quoi qu'il arrive ; les orphelines sont
+  // purgées côté serveur par la tâche d'entretien.
+  await api.deletePhoto(id).catch(() => {});
 }
 
 /* ------------------------------------------------------------------- envoi */
@@ -444,7 +461,7 @@ async function submit() {
     for (const error of errors) showFieldError(elements.steps, error.field, error.message);
     const first = state.fields.find(field => field.name === errors[0].field);
     const stepIndex = STEPS.findIndex(step => step.sections.includes(first.sectionId));
-    if (stepIndex >= 0 && stepIndex !== state.step) goToStep(stepIndex);
+    if (stepIndex >= 0 && stepIndex !== state.step) goToStep(stepIndex, { focus: false });
     renderErrorSummary(elements.summary, errors, focusField);
     return;
   }
@@ -461,9 +478,9 @@ async function submit() {
       imageIds: state.draft.photos.map(photo => photo.id)
     });
 
-    rememberPhone(values.recipientPhone.replace(/[\s().-]/g, ''));
-    // À partir d'ici l'enregistrement est acquis. Tout ce qui suit, PDF,
-    // WhatsApp, peut échouer sans remettre les données en cause.
+    state.store.rememberPhone(values.recipientPhone.replace(/[\s().-]/g, ''));
+    // À partir d'ici l'enregistrement est acquis. Le PDF et WhatsApp peuvent
+    // échouer sans remettre les données en cause.
     showDone(result, values);
   } catch (error) {
     state.submitting = false;
@@ -484,34 +501,40 @@ function showDone(result, values) {
   elements.steps.hidden = true;
   elements.actions.hidden = true;
   elements.summary.hidden = true;
-  $('#progress').hidden = true;
+  elements.progress.hidden = true;
+  elements.status.textContent = '';
 
   const phone = values.recipientPhone.replace(/[\s().-]/g, '');
   const greeting = result.greeting || 'Bonjour, veuillez trouver ci-joint la transmission du jour.';
+  const person = state.beneficiaries.find(entry => entry.id === values.personName)?.fullName || '';
+  const sheetPending = !['synced', 'skipped'].includes(result.sheet?.status);
 
   elements.done.innerHTML = `
-    <div class="card">
+    <div class="card done reveal">
+      <div class="done__icon"></div>
       <p class="eyebrow">Transmission enregistrée</p>
-      <h2>${escapeHtml(result.alreadySaved ? 'Déjà enregistrée' : 'C’est enregistré')}</h2>
+      <h2>${escapeHtml(result.alreadySaved ? 'Déjà enregistrée' : 'Merci, c’est enregistré')}</h2>
       <p class="card__hint">${escapeHtml(
         result.alreadySaved
           ? 'Cette transmission avait déjà été envoyée : aucune ligne en double n’a été créée.'
-          : 'Les données sont en sécurité. Récupérez le PDF puis partagez-le sur WhatsApp.'
+          : `La journée${person ? ` de ${person}` : ''} est enregistrée. Il ne reste qu’à partager le PDF avec la famille.`
       )}</p>
-      ${result.sheet?.status !== 'synced' ? `
-        <p class="alert alert--warn" style="margin-top:16px">
-          La copie vers Google Sheets n’a pas encore abouti. L’enregistrement est
-          bien fait et la copie sera reprise automatiquement.
-        </p>` : ''}
-      <div class="stack" style="margin-top:24px">
-        <button type="button" class="btn btn--primary" id="get-pdf">Télécharger le PDF</button>
-        <a class="btn btn--ghost" id="open-whatsapp"
-           href="https://wa.me/${encodeURIComponent(phone.slice(1))}?text=${encodeURIComponent(greeting)}"
-           target="_blank" rel="noopener">Ouvrir WhatsApp</a>
+      ${sheetPending ? `
+        <div class="alert alert--warn">
+          <p>La copie vers Google Sheets n’a pas encore abouti. L’enregistrement est bien fait et la copie sera reprise automatiquement.</p>
+        </div>` : ''}
+      <div class="done__actions">
+        <button type="button" class="btn btn--primary" id="get-pdf"></button>
+        <a class="btn btn--ghost" id="open-whatsapp" target="_blank" rel="noopener"
+           href="https://wa.me/${encodeURIComponent(phone.slice(1))}?text=${encodeURIComponent(greeting)}"></a>
         <button type="button" class="btn btn--quiet" id="restart">Nouvelle transmission</button>
       </div>
-      <p class="status" id="done-status"></p>
+      <p class="status" id="done-status" role="status" aria-live="polite"></p>
     </div>`;
+
+  elements.done.querySelector('.done__icon').append(icon('check'));
+  $('#get-pdf').append(icon('download'), 'Télécharger le PDF');
+  $('#open-whatsapp').append(icon('chat'), 'Ouvrir WhatsApp');
   elements.done.hidden = false;
   elements.done.focus();
 
@@ -524,8 +547,7 @@ function showDone(result, values) {
     doneStatus.textContent = 'Préparation du PDF…';
     try {
       const file = await fetchPdf(result.pdfUrl, filename);
-      // Sur téléphone, le partage natif permet d'envoyer le PDF directement
-      // dans WhatsApp. Ailleurs, on télécharge.
+      // Sur téléphone, le partage natif envoie le PDF directement dans WhatsApp.
       if (navigator.canShare?.({ files: [file] }) && navigator.share) {
         await navigator.share({ files: [file], text: greeting });
         doneStatus.textContent = 'Choisissez WhatsApp puis le destinataire.';
@@ -534,21 +556,20 @@ function showDone(result, values) {
         doneStatus.textContent = 'PDF téléchargé. Joignez-le dans WhatsApp.';
       }
     } catch (error) {
-      if (error?.name === 'AbortError') doneStatus.textContent = 'Partage annulé.';
-      else doneStatus.textContent = error.message || 'PDF indisponible.';
+      doneStatus.textContent = error?.name === 'AbortError' ? 'Partage annulé.' : (error.message || 'PDF indisponible.');
     } finally {
       button.disabled = false;
     }
   });
 
   $('#restart').addEventListener('click', () => {
-    clearDraft();
+    state.store.clear();
     location.reload();
   });
 
   // Le brouillon n'est effacé qu'une fois la transmission acquise côté serveur.
-  clearDraft();
-  state.draft = { clientRef: newClientRef(), values: {}, photos: [], step: 0 };
+  state.store.clear();
+  state.draft = { clientRef: state.store.newClientRef(), values: {}, photos: [], step: 0 };
 }
 
 function download(file) {
@@ -567,17 +588,16 @@ function download(file) {
 let statusTimer = null;
 
 function setStatus(message, kind = '') {
-  elements.status.className = `status${kind ? ` status--${kind === 'busy' ? '' : kind}` : ''}`.trim();
-  elements.status.innerHTML = kind === 'busy' ? '<span class="spinner"></span>' : '';
+  elements.status.className = `status${kind && kind !== 'busy' ? ` status--${kind}` : ''}`;
+  elements.status.replaceChildren();
+  if (kind === 'busy') {
+    const spinner = document.createElement('span');
+    spinner.className = 'spinner';
+    elements.status.append(spinner);
+  } else if (kind === 'saved') {
+    elements.status.append(icon('check'));
+  }
   elements.status.append(message);
   clearTimeout(statusTimer);
-  if (kind === 'saved') {
-    statusTimer = setTimeout(() => { elements.status.textContent = ''; }, 2500);
-  }
-}
-
-function escapeHtml(value) {
-  const div = document.createElement('div');
-  div.textContent = String(value ?? '');
-  return div.innerHTML;
+  if (kind === 'saved') statusTimer = setTimeout(() => elements.status.replaceChildren(), 2600);
 }

@@ -30,7 +30,8 @@ transmissionsRouter.get('/', requireAuth, asyncHandler(async (req, res) => {
   const items = await service.listForUser({
     user: req.user,
     limit: Number(req.query.limit) || 30,
-    before: req.query.before || null
+    before: req.query.before || null,
+    beneficiaryId: req.query.beneficiaryId || null
   });
   res.json({ ok: true, items });
 }));

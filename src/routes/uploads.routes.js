@@ -6,6 +6,7 @@ import { badRequest, notFound } from '../lib/errors.js';
 import { asyncHandler, requireUuidParam } from '../lib/http.js';
 import { rateLimit } from '../lib/rateLimit.js';
 import * as images from '../repositories/images.repo.js';
+import { getImage } from '../services/transmissions.service.js';
 
 export const uploadsRouter = Router();
 
@@ -80,14 +81,15 @@ uploadsRouter.delete('/:id', requireUuidParam(), requireRole('aidant'), asyncHan
 
 /**
  * Sert une photo déjà enregistrée (aperçu dans le formulaire et l'historique).
- * L'authentification est indispensable : ce sont des photos d'une personne
- * accompagnée, elles ne doivent jamais être accessibles avec la seule URL.
+ * Être connecté ne suffit pas : la photo suit les droits de sa transmission,
+ * sinon un compte d'une famille pourrait lire les photos d'une autre.
  */
 uploadsRouter.get('/:id', requireUuidParam(), requireAuth, asyncHandler(async (req, res) => {
-  const image = await images.findOne(req.params.id);
-  if (!image) throw notFound('Photo introuvable.');
+  const image = await getImage({ user: req.user, id: req.params.id });
   res.setHeader('Content-Type', image.mime_type);
-  res.setHeader('Cache-Control', 'private, max-age=3600');
+  // Pas de copie en cache : sur un téléphone partagé, la photo resterait
+  // lisible après la déconnexion.
+  res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(image.filename)}"`);
   res.send(image.content);
 }));

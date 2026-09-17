@@ -7,6 +7,7 @@ import { MAX_IMAGES, MAX_IMAGE_BYTES, SECTIONS } from './domain/schema.js';
 import { apiNotFound, errorHandler } from './lib/http.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { authRouter } from './routes/auth.routes.js';
+import { beneficiariesRouter } from './routes/beneficiaries.routes.js';
 import { transmissionsRouter } from './routes/transmissions.routes.js';
 import { uploadsRouter } from './routes/uploads.routes.js';
 
@@ -30,6 +31,14 @@ export function createApp() {
   // 3 Mo : une photo compressée par requête, avec de la marge. On reste
   // largement sous la limite de 4,5 Mo des fonctions serverless.
   app.use('/api', express.json({ limit: '3mb' }));
+
+  // Aucune réponse de l'API ne doit rester dans un cache : ce sont des données
+  // de santé, et un navigateur partagé les resservirait après la déconnexion.
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
+
   app.use('/api', attachUser, requireSameOrigin);
 
   app.get('/api/schema', (_req, res) => {
@@ -37,6 +46,7 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/beneficiaries', beneficiariesRouter);
   app.use('/api/uploads', uploadsRouter);
   app.use('/api/transmissions', transmissionsRouter);
   app.use('/api/admin', adminRouter);

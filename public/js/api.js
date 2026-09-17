@@ -108,7 +108,20 @@ export const api = {
 
   submit: payload => request('/api/transmissions', { method: 'POST', body: payload, timeoutMs: 45000 }),
   list: params => request(`/api/transmissions?${new URLSearchParams(params)}`),
-  one: id => request(`/api/transmissions/${id}`)
+  one: id => request(`/api/transmissions/${id}`),
+
+  beneficiaries: () => request('/api/beneficiaries'),
+
+  admin: {
+    users: () => request('/api/admin/users'),
+    createUser: payload => request('/api/admin/users', { method: 'POST', body: payload }),
+    setUserActive: (id, isActive) => request(`/api/admin/users/${id}`, { method: 'PATCH', body: { isActive } }),
+    setUserBeneficiaries: (id, beneficiaryIds) =>
+      request(`/api/admin/users/${id}/beneficiaries`, { method: 'PUT', body: { beneficiaryIds } }),
+    beneficiaries: () => request('/api/admin/beneficiaries'),
+    createBeneficiary: fullName => request('/api/admin/beneficiaries', { method: 'POST', body: { fullName } }),
+    updateBeneficiary: (id, patch) => request(`/api/admin/beneficiaries/${id}`, { method: 'PATCH', body: patch })
+  }
 };
 
 /** Récupère le PDF en tant que fichier, en propageant les erreurs JSON. */

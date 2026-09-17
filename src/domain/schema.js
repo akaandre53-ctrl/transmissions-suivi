@@ -21,7 +21,10 @@ export const SECTIONS = [
     hint: 'Qui, quand, dans quel contexte.',
     fields: [
       { name: 'date', label: 'Date du suivi', type: 'date', required: true },
-      { name: 'personName', label: 'Personne accompagnée', type: 'text', required: true, placeholder: 'Nom et prénom' },
+      // Type « beneficiary » : liste des personnes confiées au compte. Le
+      // formulaire envoie l'identifiant de la fiche ; le serveur le remplace par
+      // le nom avant validation (voir transmissions.service.js).
+      { name: 'personName', label: 'Personne accompagnée', type: 'beneficiary', required: true },
       { name: 'caregiverName', label: 'Accompagnant(e)', type: 'text', required: true, placeholder: 'Nom et prénom' },
       { name: 'period', label: 'Moment du suivi', type: 'select', options: ['Matin', 'Après-midi', 'Soir', 'Journée complète'] },
       { name: 'generalDescription', label: 'Contexte de la journée', type: 'textarea', help: 'Facultatif : information utile pour comprendre la journée.' }

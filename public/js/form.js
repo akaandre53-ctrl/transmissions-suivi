@@ -9,7 +9,11 @@
 
 const REQUIRED_MARK = 'obligatoire';
 
-export function createField(field) {
+/**
+ * @param {object} field    définition issue du schéma
+ * @param {object} context  { beneficiaries: [{ id, fullName }] } pour le type « beneficiary »
+ */
+export function createField(field, context = {}) {
   const wrapper = document.createElement('div');
   wrapper.className = 'field';
   wrapper.dataset.field = field.name;
@@ -32,7 +36,7 @@ export function createField(field) {
 
   const control = document.createElement('div');
   control.className = 'field__control';
-  control.append(buildControl(field, id, errorId));
+  control.append(buildControl(field, id, errorId, context));
   if (field.unit) {
     const unit = document.createElement('span');
     unit.className = 'field__unit';
@@ -63,7 +67,33 @@ export function createField(field) {
   return wrapper;
 }
 
-function buildControl(field, id, errorId) {
+function buildControl(field, id, errorId, context = {}) {
+  // Personne accompagnée : liste des seules personnes confiées au compte.
+  // La valeur envoyée est l'identifiant de la fiche, le serveur y substitue le
+  // nom. Une seule personne confiée : elle est présélectionnée.
+  if (field.type === 'beneficiary') {
+    const people = context.beneficiaries || [];
+    const select = document.createElement('select');
+    select.id = id;
+    select.name = field.name;
+    if (people.length !== 1) {
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = people.length ? 'Choisir la personne…' : 'Aucune personne ne vous est confiée';
+      select.append(blank);
+    }
+    for (const person of people) {
+      const option = document.createElement('option');
+      option.value = person.id;
+      option.textContent = person.fullName;
+      select.append(option);
+    }
+    if (people.length === 1) select.value = people[0].id;
+    if (!people.length) select.disabled = true;
+    select.setAttribute('aria-describedby', errorId);
+    return select;
+  }
+
   if (field.type === 'select') {
     const select = document.createElement('select');
     select.id = id;
