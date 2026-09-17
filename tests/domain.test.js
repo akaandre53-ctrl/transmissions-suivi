@@ -209,6 +209,36 @@ describe('PDF', () => {
     }
   });
 
+  test('chaque page porte la mention cliquable vers Prime Advisors', async () => {
+    const { values } = validateTransmission(base());
+    const photo = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const buffer = await renderTransmissionPdf(
+      { id: 'x', entry_date: '2026-08-31', created_at: new Date(), data: values, summary: '' },
+      [{ category: 'Photo du déjeuner', content: photo }, { category: 'Photo du dîner', content: photo }],
+      { compress: false }
+    );
+    const raw = buffer.toString('latin1');
+    const pages = (raw.match(/\/Type \/Page\b/g) || []).length;
+    const links = (raw.match(/\/URI \(https:\/\/www\.primeadvisors-sb\.com\/\)/g) || []).length;
+    assert.equal(pages, 3, 'une page de contenu et une page par photo');
+    assert.equal(links, pages, 'un lien par page');
+  });
+
+  test('le pied de page ne crée pas de page blanche', async () => {
+    // Écrire sous la marge basse fait ajouter une page par pdfkit. Un pied de
+    // page mal géré double donc le nombre de pages.
+    const { values } = validateTransmission(base());
+    const buffer = await renderTransmissionPdf(
+      { id: 'x', entry_date: '2026-08-31', created_at: new Date(), data: values, summary: '' },
+      [],
+      { compress: false }
+    );
+    assert.equal((buffer.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1);
+  });
+
   test('le nom de fichier est débarrassé des accents', () => {
     assert.equal(
       pdfFilename({ personName: 'Aïssatou Koné-Diabaté', date: '2026-08-31' }),
