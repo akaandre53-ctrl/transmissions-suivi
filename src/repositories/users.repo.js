@@ -26,6 +26,19 @@ export async function create({ email, passwordHash, fullName, role }) {
   return rows[0];
 }
 
+/** Renomme un compte ou change son adresse de connexion. */
+export async function updateProfile(id, { fullName = null, email = null }) {
+  const { rows } = await query(
+    `UPDATE users
+        SET full_name = COALESCE($2, full_name),
+            email = COALESCE($3, email)
+      WHERE id = $1
+      RETURNING ${PUBLIC_COLUMNS}`,
+    [id, fullName, email ? String(email).trim().toLowerCase() : null]
+  );
+  return rows[0] || null;
+}
+
 export async function updatePassword(id, passwordHash) {
   await query('UPDATE users SET password_hash = $2 WHERE id = $1', [id, passwordHash]);
 }

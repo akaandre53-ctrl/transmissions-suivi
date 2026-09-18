@@ -241,6 +241,40 @@ try {
   const imageObjects = (pdf.toString('latin1').match(/\/Subtype\s*\/Image/g) || []).length;
   check('photo dessinée dans le PDF', imageObjects >= 1, `${imageObjects} objet(s) image`);
 
+  console.log('\nAdministration des comptes');
+  const patch = (id, body) => admin.call(`/api/admin/users/${id}`, { method: 'PATCH', body });
+
+  check('renommage refusé si le nom est vide', (await patch(aidante.id, { fullName: ' ' })).status === 400);
+  check('adresse déjà prise refusée', (await patch(aidante.id, { email: familleA.email })).status === 400);
+  check('mot de passe trop court refusé', (await patch(aidante.id, { password: 'court' })).status === 400);
+  check('l’admin ne peut pas se désactiver', (await patch(admin.id, { isActive: false })).status === 400);
+
+  const nouveauNom = `Contrôle renommée ${STAMP}`;
+  check('renommage accepté', (await patch(aidante.id, { fullName: nouveauNom })).status === 200);
+  const renamed = await query('SELECT full_name FROM users WHERE id = $1', [aidante.id]);
+  check('le nouveau nom est en base', renamed.rows[0].full_name === nouveauNom);
+  const listed = await json(await admin.call('/api/transmissions?limit=100'));
+  check('l’historique affiche déjà le nouveau nom',
+    listed.items.find(i => i.id === transmissionId)?.authorName === nouveauNom);
+
+  const nouvelEmail = `controle-renommee-${STAMP}@controle.local`;
+  check('changement d’adresse accepté', (await patch(aidante.id, { email: nouvelEmail })).status === 200);
+
+  const nouveauMotDePasse = 'nouveau-mot-de-passe-2026';
+  const reset = await patch(aidante.id, { password: nouveauMotDePasse });
+  check('mot de passe remplacé', reset.status === 200 && (await json(reset)).sessionsRevoked === true);
+  // Le remplacement doit couper les sessions ouvertes, sinon l'appareil dont il
+  // fallait retirer l'accès reste connecté.
+  check('la session ouverte de l’aidante est coupée', (await aidante.call('/api/auth/me')).status === 401);
+
+  const ancien = await anonymous('/api/auth/login', { method: 'POST', body: { email: nouvelEmail, password: PASSWORD } });
+  check('l’ancien mot de passe ne fonctionne plus', ancien.status === 401);
+  const nouveau = session();
+  const ouverture = await nouveau('/api/auth/login', { method: 'POST', body: { email: nouvelEmail, password: nouveauMotDePasse } });
+  check('la nouvelle adresse et le nouveau mot de passe ouvrent la session', ouverture.status === 200);
+  check('la famille ne peut pas modifier un compte',
+    (await familleA.call(`/api/admin/users/${aidante.id}`, { method: 'PATCH', body: { fullName: 'Pirate' } })).status === 403);
+
 } catch (error) {
   console.log('\nEXCEPTION :', error.message);
   ko++;

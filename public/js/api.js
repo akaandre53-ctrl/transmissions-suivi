@@ -115,6 +115,7 @@ export const api = {
   admin: {
     users: () => request('/api/admin/users'),
     createUser: payload => request('/api/admin/users', { method: 'POST', body: payload }),
+    updateUser: (id, patch) => request(`/api/admin/users/${id}`, { method: 'PATCH', body: patch }),
     setUserActive: (id, isActive) => request(`/api/admin/users/${id}`, { method: 'PATCH', body: { isActive } }),
     setUserBeneficiaries: (id, beneficiaryIds) =>
       request(`/api/admin/users/${id}/beneficiaries`, { method: 'PUT', body: { beneficiaryIds } }),

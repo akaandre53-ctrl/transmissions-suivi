@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { hashPassword } from '../auth/password.js';
 import { requireRole } from '../auth/middleware.js';
-import { purgeExpiredSessions } from '../auth/session.js';
+import { createSession, destroyAllSessions, purgeExpiredSessions, setSessionCookie } from '../auth/session.js';
 import { config, isSheetsConfigured } from '../config.js';
 import { query } from '../db/pool.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -115,13 +115,67 @@ adminRouter.post('/users', requireRole('admin'), asyncHandler(async (req, res) =
   res.status(201).json({ ok: true, user: created });
 }));
 
+/**
+ * Corrige un compte : nom affiché, adresse de connexion, mot de passe,
+ * activation. Un nom saisi à la hâte se retrouve partout, jusque dans la
+ * feuille et les PDF ; il faut pouvoir le rattraper sans recréer le compte.
+ */
 adminRouter.patch('/users/:id', requireUuidParam(), requireRole('admin'), asyncHandler(async (req, res) => {
-  if (req.params.id === req.user.id && req.body?.isActive === false) {
-    throw badRequest('Vous ne pouvez pas désactiver votre propre compte.');
+  const target = await users.findById(req.params.id);
+  if (!target) throw notFound('Compte introuvable.');
+  const isSelf = target.id === req.user.id;
+
+  const body = req.body || {};
+  const patch = {};
+  let password = null;
+
+  if (typeof body.fullName === 'string') {
+    const fullName = body.fullName.trim().replace(/\s+/g, ' ');
+    if (fullName.length < 2) throw badRequest('Renseignez le nom complet.');
+    if (fullName.length > 120) throw badRequest('Ce nom est trop long.');
+    patch.fullName = fullName;
   }
-  const updated = await users.setActive(req.params.id, Boolean(req.body?.isActive));
-  if (!updated) throw notFound('Compte introuvable.');
-  res.json({ ok: true, user: updated });
+
+  if (typeof body.email === 'string') {
+    const email = body.email.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw badRequest('Adresse e-mail invalide.');
+    const existing = await users.findByEmail(email);
+    if (existing && existing.id !== target.id) throw badRequest('Un autre compte utilise déjà cet e-mail.');
+    patch.email = email;
+  }
+
+  if (typeof body.password === 'string' && body.password !== '') {
+    if (body.password.length < 10) throw badRequest('Le mot de passe doit contenir au moins 10 caractères.');
+    password = body.password;
+  }
+
+  if (typeof body.isActive === 'boolean') {
+    if (isSelf && body.isActive === false) {
+      throw badRequest('Vous ne pouvez pas désactiver votre propre compte.');
+    }
+    await users.setActive(target.id, body.isActive);
+  }
+
+  let updated = null;
+  if (patch.fullName || patch.email) updated = await users.updateProfile(target.id, patch);
+
+  if (password) {
+    await users.updatePassword(target.id, await hashPassword(password));
+    // Un mot de passe remplacé doit déconnecter partout : sinon l'appareil
+    // d'où il fallait couper l'accès reste connecté.
+    await destroyAllSessions(target.id);
+    if (isSelf) {
+      // L'admin qui change son propre mot de passe garde sa session courante.
+      const token = await createSession(target.id, req.get('User-Agent') || '');
+      setSessionCookie(res, token);
+    }
+  }
+
+  res.json({
+    ok: true,
+    user: updated || await users.findById(target.id),
+    sessionsRevoked: Boolean(password)
+  });
 }));
 
 adminRouter.get('/health', requireRole('admin', 'famille'), asyncHandler(async (_req, res) => {

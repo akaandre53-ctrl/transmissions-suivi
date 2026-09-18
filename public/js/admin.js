@@ -181,6 +181,8 @@ function renderAccounts() {
       body.append(linksEditor(user));
     }
 
+    body.append(profileEditor(user));
+
     if (user.id !== state.me.id) {
       const toggle = document.createElement('button');
       toggle.type = 'button';
@@ -198,6 +200,115 @@ function renderAccounts() {
     card.append(body);
     return card;
   }));
+}
+
+/**
+ * Corriger un compte sans le recréer : nom affiché, adresse de connexion,
+ * mot de passe. Replié par défaut, pour ne pas alourdir la liste.
+ */
+function profileEditor(user) {
+  const details = document.createElement('details');
+  details.className = 'disclosure';
+  details.style.marginTop = '12px';
+
+  const summary = document.createElement('summary');
+  summary.className = 'btn btn--quiet btn--small';
+  summary.style.display = 'inline-flex';
+  summary.append(icon('user'), 'Modifier ce compte');
+  details.append(summary);
+
+  const form = document.createElement('form');
+  form.className = 'grid grid--pair';
+  form.style.marginTop = '14px';
+  form.noValidate = true;
+
+  const field = (label, name, { type = 'text', value = '', help = '', autocomplete = 'off' } = {}) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+    const id = `champ-${name}-${user.id}`;
+    const labelElement = document.createElement('label');
+    labelElement.className = 'field__label';
+    labelElement.setAttribute('for', id);
+    labelElement.textContent = label;
+    const input = document.createElement('input');
+    input.id = id;
+    input.name = name;
+    input.type = type;
+    input.value = value;
+    input.autocomplete = autocomplete;
+    if (name === 'email') input.autocapitalize = 'none';
+    wrapper.append(labelElement, input);
+    if (help) {
+      const hint = document.createElement('p');
+      hint.className = 'field__help';
+      hint.textContent = help;
+      wrapper.append(hint);
+    }
+    return wrapper;
+  };
+
+  form.append(
+    field('Nom complet', 'fullName', { value: user.full_name }),
+    field('Adresse de connexion', 'email', { type: 'email', value: user.email }),
+    field('Nouveau mot de passe', 'password', {
+      value: '',
+      autocomplete: 'new-password',
+      help: 'Laissez vide pour ne pas le changer. 10 caractères minimum.'
+    })
+  );
+
+  const generate = document.createElement('button');
+  generate.type = 'button';
+  generate.className = 'btn btn--ghost btn--small';
+  generate.style.alignSelf = 'end';
+  generate.textContent = 'Générer un mot de passe';
+  generate.addEventListener('click', () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(9));
+    form.password.value = btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, '').slice(0, 12);
+    form.password.type = 'text';
+  });
+  form.append(generate);
+
+  const save = document.createElement('div');
+  save.className = 'field field--wide';
+  const button = document.createElement('button');
+  button.type = 'submit';
+  button.className = 'btn btn--primary btn--small';
+  button.append(icon('check'), 'Enregistrer les modifications');
+  save.append(button);
+  form.append(save);
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const patch = {};
+    if (form.fullName.value.trim() !== user.full_name) patch.fullName = form.fullName.value.trim();
+    if (form.email.value.trim().toLowerCase() !== user.email) patch.email = form.email.value.trim();
+    if (form.password.value) patch.password = form.password.value;
+
+    if (!Object.keys(patch).length) {
+      showError('Aucune modification à enregistrer.');
+      return;
+    }
+    if (patch.password && !confirm(
+      `Remplacer le mot de passe de ${user.full_name} ? Le compte sera déconnecté de tous ses appareils et devra utiliser le nouveau mot de passe.`
+    )) return;
+
+    const message = [
+      patch.fullName ? 'nom' : null,
+      patch.email ? 'adresse' : null,
+      patch.password ? 'mot de passe' : null
+    ].filter(Boolean).join(', ');
+
+    const done = await run(() => api.admin.updateUser(user.id, patch), `Compte mis à jour : ${message}.`);
+    if (!done) return;
+    form.password.value = '';
+    // Le nom affiché dans l'en-tête vient de la session : il faut recharger
+    // la page pour le voir changer sur son propre compte.
+    if (user.id === state.me.id && patch.fullName) location.reload();
+  });
+
+  details.append(form);
+  return details;
 }
 
 function linksEditor(user) {

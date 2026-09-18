@@ -81,7 +81,14 @@ npm run create-user -- --email vous@exemple.ci --nom "Votre Nom" --role admin
 Le mot de passe est demandé sans être affiché. Sans terminal interactif, un mot
 de passe est généré et affiché une seule fois.
 
-Les autres comptes se créent ensuite depuis la page **Administration**.
+Les autres comptes se créent ensuite depuis la page **Administration**, qui
+permet aussi de corriger un compte existant : nom affiché, adresse de connexion
+et mot de passe. Un nom saisi à la hâte se retrouve partout, jusque dans la
+feuille et les PDF, et il vaut mieux le rattraper que recréer le compte.
+
+Un mot de passe remplacé **déconnecte le compte de tous ses appareils** : c'est
+la seule façon de retirer réellement l'accès à un téléphone perdu. L'admin qui
+change le sien garde la session en cours.
 
 ### Qui voit quoi
 

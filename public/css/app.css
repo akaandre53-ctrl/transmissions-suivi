@@ -1037,6 +1037,14 @@ input:focus, select:focus, textarea:focus {
 .row--inactive { opacity: .62; }
 .row__main { flex: 1; min-width: 0; }
 .row__actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+/* Sur téléphone, deux boutons d'action laissent trop peu de place au nom :
+   il passe sur toute la largeur et les actions se rangent dessous. */
+@media (max-width: 560px) {
+  .row { flex-wrap: wrap; }
+  .row__main { flex-basis: 100%; }
+  .row__actions { width: 100%; justify-content: flex-start; }
+}
 .row__title { font-weight: 800; }
 .row__sub { font-size: .84rem; color: var(--muted); overflow-wrap: anywhere; }
 
