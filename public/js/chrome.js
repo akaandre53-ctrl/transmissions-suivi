@@ -97,6 +97,28 @@ export async function setupChrome({ page, roles = null, beforeLogout = null } = 
   return user;
 }
 
+/** Propose un fichier au téléchargement. */
+export function saveFile(file) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Copie un texte, sans jamais faire échouer l'action qui l'entoure. */
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function escapeHtml(value) {
   const div = document.createElement('div');
   div.textContent = String(value ?? '');

@@ -1,5 +1,5 @@
 import { ApiError, api, fetchPdf } from './api.js';
-import { escapeHtml, firstName, setupChrome, todayLabel } from './chrome.js';
+import { copyText, escapeHtml, firstName, saveFile, setupChrome, todayLabel } from './chrome.js';
 import { createDraftStore } from './draft.js';
 import {
   clearAllErrors, clearFieldError, createField, isFieldActive,
@@ -524,42 +524,81 @@ function showDone(result, values) {
           <p>La copie vers Google Sheets n’a pas encore abouti. L’enregistrement est bien fait et la copie sera reprise automatiquement.</p>
         </div>` : ''}
       <div class="done__actions">
-        <button type="button" class="btn btn--primary" id="get-pdf"></button>
-        <a class="btn btn--ghost" id="open-whatsapp" target="_blank" rel="noopener"
-           href="https://wa.me/${encodeURIComponent(phone.slice(1))}?text=${encodeURIComponent(greeting)}"></a>
+        <button type="button" class="btn btn--primary" id="send-whatsapp"></button>
+        <button type="button" class="btn btn--ghost" id="get-pdf"></button>
         <button type="button" class="btn btn--quiet" id="restart">Nouvelle transmission</button>
       </div>
       <p class="status" id="done-status" role="status" aria-live="polite"></p>
     </div>`;
 
   elements.done.querySelector('.done__icon').append(icon('check'));
-  $('#get-pdf').append(icon('download'), 'Télécharger le PDF');
-  $('#open-whatsapp').append(icon('chat'), 'Ouvrir WhatsApp');
+  $('#send-whatsapp').append(icon('chat'), 'Envoyer sur WhatsApp');
+  $('#get-pdf').append(icon('download'), 'Télécharger le PDF seulement');
   elements.done.hidden = false;
   elements.done.focus();
 
   const doneStatus = $('#done-status');
   const filename = `transmission-${values.date}.pdf`;
 
-  $('#get-pdf').addEventListener('click', async event => {
+  const setDoneStatus = (message, kind = '') => {
+    doneStatus.className = `status${kind ? ` status--${kind}` : ''}`;
+    doneStatus.textContent = message;
+  };
+
+  const withButton = (id, action) => $(`#${id}`).addEventListener('click', async event => {
     const button = event.currentTarget;
     button.disabled = true;
-    doneStatus.textContent = 'Préparation du PDF…';
     try {
-      const file = await fetchPdf(result.pdfUrl, filename);
-      // Sur téléphone, le partage natif envoie le PDF directement dans WhatsApp.
-      if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-        await navigator.share({ files: [file], text: greeting });
-        doneStatus.textContent = 'Choisissez WhatsApp puis le destinataire.';
-      } else {
-        download(file);
-        doneStatus.textContent = 'PDF téléchargé. Joignez-le dans WhatsApp.';
-      }
+      await action();
     } catch (error) {
-      doneStatus.textContent = error?.name === 'AbortError' ? 'Partage annulé.' : (error.message || 'PDF indisponible.');
+      setDoneStatus(
+        error?.name === 'AbortError' ? 'Envoi annulé, la transmission reste enregistrée.' : (error.message || 'Action impossible.'),
+        error?.name === 'AbortError' ? '' : 'error'
+      );
     } finally {
       button.disabled = false;
     }
+  });
+
+  /**
+   * Un seul geste : le PDF part avec le message vers WhatsApp, où l'aidante
+   * choisit le ou les contacts. Le partage natif du téléphone ne demande pas
+   * de télécharger d'abord puis de joindre à la main.
+   */
+  withButton('send-whatsapp', async () => {
+    setDoneStatus('Préparation du PDF…', '');
+    const file = await fetchPdf(result.pdfUrl, filename);
+
+    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+      // WhatsApp ne reprend pas toujours le texte qui accompagne un document :
+      // on le met dans le presse-papiers pour qu'il suffise de le coller.
+      const copied = await copyText(greeting);
+      await navigator.share({ files: [file], text: greeting, title: 'Transmission du jour' });
+      setDoneStatus(
+        copied
+          ? 'Choisissez WhatsApp puis le contact. Si le message n’apparaît pas, collez-le, il est copié.'
+          : 'Choisissez WhatsApp puis le contact.',
+        'saved'
+      );
+      return;
+    }
+
+    // Ordinateur : le partage natif n'existe pas. On enchaîne les deux gestes
+    // au lieu de les laisser à l'utilisateur.
+    saveFile(file);
+    await copyText(greeting);
+    window.open(
+      `https://wa.me/${encodeURIComponent(phone.slice(1))}?text=${encodeURIComponent(greeting)}`,
+      '_blank',
+      'noopener'
+    );
+    setDoneStatus('WhatsApp est ouvert avec le message. Joignez le PDF qui vient d’être téléchargé.', 'saved');
+  });
+
+  withButton('get-pdf', async () => {
+    setDoneStatus('Préparation du PDF…', '');
+    saveFile(await fetchPdf(result.pdfUrl, filename));
+    setDoneStatus('PDF téléchargé.', 'saved');
   });
 
   $('#restart').addEventListener('click', () => {
@@ -570,17 +609,6 @@ function showDone(result, values) {
   // Le brouillon n'est effacé qu'une fois la transmission acquise côté serveur.
   state.store.clear();
   state.draft = { clientRef: state.store.newClientRef(), values: {}, photos: [], step: 0 };
-}
-
-function download(file) {
-  const url = URL.createObjectURL(file);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = file.name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* --------------------------------------------------------------- utilitaires */

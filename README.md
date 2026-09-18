@@ -22,7 +22,8 @@ src/
   auth/                 Mots de passe (scrypt), sessions en base, rôles, CSRF
   db/                   Pool Postgres, migrations SQL
   repositories/         Accès aux tables, sans logique métier
-  services/             Orchestration : transmissions, PDF, message, miroir Sheets
+  services/             Orchestration : transmissions, PDF, message, miroir Sheets,
+                        export CSV
   routes/               Points d'entrée HTTP
   app.js                Assemblage Express
 public/
@@ -171,7 +172,14 @@ en attente, purge les sessions expirées et supprime les photos jamais validées
 3. Ajoutez les photos au fil des étapes. Chacune part immédiatement, une par une.
 4. À la dernière étape, validez. Les données sont enregistrées avant toute autre
    opération.
-5. Téléchargez le PDF, puis ouvrez WhatsApp et envoyez-le vous-même.
+5. Touchez **Envoyer sur WhatsApp**. Sur téléphone, le PDF et le message
+   partent ensemble vers le partage du système : vous choisissez WhatsApp,
+   puis le ou les contacts. Sur ordinateur, le PDF est téléchargé et WhatsApp
+   s’ouvre avec le message ; il reste à joindre le fichier.
+
+Le message d’accompagnement est aussi copié dans le presse-papiers : WhatsApp
+ne reprend pas toujours le texte qui accompagne un document, il suffit alors de
+le coller.
 
 Si la connexion lâche pendant l'envoi, renvoyez simplement le formulaire :
 la référence du brouillon empêche la création d'une deuxième ligne.
@@ -184,7 +192,8 @@ la référence du brouillon empêche la création d'une deuxième ligne.
 npm test
 ```
 
-59 tests hors ligne : schéma, validation, règles d'accès, résumé, PDF (accents,
+69 tests hors ligne : schéma, validation, règles d'accès, résumé, export CSV
+(échappement, virgule décimale, formules neutralisées), PDF (accents,
 mention sur chaque page, absence de page blanche) et contrat HTTP
 (authentification, CSRF, format des réponses d'erreur). Ils ne touchent jamais la
 base, `tests/setup.js` fixe `DATABASE_URL` sur un port fermé.
@@ -220,6 +229,25 @@ contrôle.
 | Limitation de débit inopérante | Compteur en mémoire, remis à zéro à chaque instance serverless | Compteur partagé en base |
 | Détails techniques renvoyés au client | `error.message` brut de l'API Google | Seuls les messages destinés à l'utilisateur sortent ; le reste est journalisé |
 | Historique partagé entre familles | Aucun lien entre un compte et la personne suivie : un compte famille voyait toutes les transmissions, photos comprises | Fiches « personne accompagnée », rattachement par compte, filtrage en SQL, contrôle sur le PDF et chaque photo |
+
+---
+
+## Export CSV
+
+Depuis la page **Administration**, le bouton **CSV** d’une personne télécharge
+toutes ses transmissions, une ligne par journée, pour en tirer des courbes
+(poids, tension, glycémie, humeur) dans un tableur.
+
+Réservé à l’administration : c’est le dossier complet d’une personne dans un
+seul fichier. Le numéro WhatsApp du destinataire en est exclu.
+
+Conventions françaises : séparateur point-virgule, virgule décimale, BOM en
+tête. Le fichier s’ouvre directement dans Excel, Google Sheets et LibreOffice,
+accents compris. Une valeur commençant par `=`, `+` ou `@` est neutralisée par
+une apostrophe, sans quoi le tableur l’exécuterait comme une formule.
+
+Filtre de période possible sur la route :
+`/api/admin/beneficiaries/<id>/export.csv?from=2026-01-01&to=2026-03-31`.
 
 ---
 

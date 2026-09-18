@@ -101,6 +101,33 @@ export async function listVisible(user, { limit = 30, before = null, beneficiary
   return rows;
 }
 
+/**
+ * Toutes les transmissions d'une personne, dans l'ordre chronologique, pour
+ * l'export CSV. Pas de pagination : un export partiel fausserait une courbe.
+ */
+export async function listForExport(beneficiaryId, { from = null, to = null } = {}) {
+  const params = [beneficiaryId];
+  const conditions = ['t.beneficiary_id = $1'];
+  if (from) {
+    params.push(from);
+    conditions.push(`t.entry_date >= $${params.length}`);
+  }
+  if (to) {
+    params.push(to);
+    conditions.push(`t.entry_date <= $${params.length}`);
+  }
+  const { rows } = await query(
+    `SELECT t.id, t.entry_date, t.person_name, t.created_at, t.data,
+            u.full_name AS author_name,
+            (SELECT count(*)::int FROM images i WHERE i.transmission_id = t.id) AS photo_count
+       FROM transmissions t JOIN users u ON u.id = t.author_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY t.entry_date, t.created_at`,
+    params
+  );
+  return rows;
+}
+
 export async function countPhotos(transmissionId) {
   const { rows } = await query(
     'SELECT count(*)::int AS total FROM images WHERE transmission_id = $1',

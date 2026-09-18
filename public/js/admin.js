@@ -1,5 +1,5 @@
-import { api } from './api.js';
-import { setupChrome } from './chrome.js';
+import { api, fetchFile } from './api.js';
+import { saveFile, setupChrome } from './chrome.js';
 import { icon } from './icons.js';
 
 const ROLE = {
@@ -64,6 +64,20 @@ function renderPeople() {
     ].filter(Boolean).join(' · ');
     main.append(title, sub);
 
+    const actions = document.createElement('div');
+    actions.className = 'row__actions';
+
+    // L'export n'a de sens que s'il y a des journées à tracer.
+    if (person.transmissions > 0) {
+      const exportButton = document.createElement('button');
+      exportButton.type = 'button';
+      exportButton.className = 'btn btn--ghost btn--small';
+      exportButton.append(icon('download'), 'CSV');
+      exportButton.title = `Exporter les ${person.transmissions} transmissions de ${person.full_name}`;
+      exportButton.addEventListener('click', () => exportCsv(person, exportButton));
+      actions.append(exportButton);
+    }
+
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'btn btn--quiet btn--small';
@@ -72,10 +86,35 @@ function renderPeople() {
       await run(() => api.admin.updateBeneficiary(person.id, { isActive: !person.is_active }),
         person.is_active ? `${person.full_name} archivée.` : `${person.full_name} réactivée.`);
     });
+    actions.append(toggle);
 
-    row.append(main, toggle);
+    row.append(main, actions);
     return row;
   }));
+}
+
+/**
+ * Télécharge l'historique complet d'une personne en CSV, prêt pour un tableur.
+ * Passe par fetch plutôt qu'un lien direct : une erreur revient alors en
+ * message et non en fichier illisible.
+ */
+async function exportCsv(person, button) {
+  const label = [...button.childNodes];
+  button.disabled = true;
+  button.replaceChildren(Object.assign(document.createElement('span'), { className: 'spinner' }), 'Export…');
+  try {
+    const file = await fetchFile(
+      `/api/admin/beneficiaries/${person.id}/export.csv`,
+      `transmissions-${person.id}.csv`
+    );
+    saveFile(file);
+    setStatus(`${file.name} téléchargé, ${person.transmissions} transmission${person.transmissions > 1 ? 's' : ''}.`);
+  } catch (error) {
+    showError(error.message || 'Export impossible.');
+  } finally {
+    button.replaceChildren(...label);
+    button.disabled = false;
+  }
 }
 
 async function addPerson(event) {

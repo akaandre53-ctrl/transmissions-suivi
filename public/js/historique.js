@@ -1,5 +1,5 @@
 import { api, fetchPdf } from './api.js';
-import { setupChrome } from './chrome.js';
+import { saveFile, setupChrome } from './chrome.js';
 import { icon } from './icons.js';
 
 const PAGE_SIZE = 20;
@@ -260,12 +260,7 @@ async function downloadPdf(item, button) {
     if (navigator.canShare?.({ files: [file] }) && navigator.share) {
       await navigator.share({ files: [file] });
     } else {
-      const url = URL.createObjectURL(file);
-      const link = Object.assign(document.createElement('a'), { href: url, download: file.name });
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      saveFile(file);
     }
   } catch (error) {
     if (error?.name !== 'AbortError') showError(error.message || 'PDF indisponible.');

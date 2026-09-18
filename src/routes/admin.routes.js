@@ -4,6 +4,7 @@ import { hashPassword } from '../auth/password.js';
 import { requireRole } from '../auth/middleware.js';
 import { purgeExpiredSessions } from '../auth/session.js';
 import { config, isSheetsConfigured } from '../config.js';
+import { query } from '../db/pool.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { asyncHandler, requireUuidParam } from '../lib/http.js';
 import { isUuid } from '../domain/access.js';
@@ -11,6 +12,7 @@ import * as beneficiaries from '../repositories/beneficiaries.repo.js';
 import * as images from '../repositories/images.repo.js';
 import * as repo from '../repositories/transmissions.repo.js';
 import * as users from '../repositories/users.repo.js';
+import { buildTransmissionsCsv, csvFilename } from '../services/export.service.js';
 import { retryPending } from '../services/sheets.service.js';
 
 export const adminRouter = Router();
@@ -54,6 +56,32 @@ adminRouter.patch('/beneficiaries/:id', requireUuidParam(), requireRole('admin')
   const updated = await beneficiaries.update(req.params.id, patch);
   if (!updated) throw notFound('Fiche introuvable.');
   res.json({ ok: true, beneficiary: updated });
+}));
+
+/**
+ * Export CSV de toutes les transmissions d'une personne, pour en tirer des
+ * courbes dans un tableur. Réservé à l'administration : c'est le dossier de
+ * santé complet d'une personne dans un seul fichier.
+ */
+adminRouter.get('/beneficiaries/:id/export.csv', requireUuidParam(), requireRole('admin'), asyncHandler(async (req, res) => {
+  const { rows: [person] } = await query(
+    'SELECT id, full_name FROM beneficiaries WHERE id = $1', [req.params.id]
+  );
+  if (!person) throw notFound('Fiche introuvable.');
+
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const from = String(req.query.from || '');
+  const to = String(req.query.to || '');
+  if ((from && !DATE.test(from)) || (to && !DATE.test(to))) {
+    throw badRequest('Dates de filtre invalides, attendu AAAA-MM-JJ.');
+  }
+
+  const rows = await repo.listForExport(person.id, { from: from || null, to: to || null });
+  const csv = buildTransmissionsCsv(rows);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${csvFilename(person.full_name, rows)}"`);
+  res.setHeader('X-Transmissions-Count', String(rows.length));
+  res.send(csv);
 }));
 
 /**

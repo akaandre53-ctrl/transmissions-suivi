@@ -124,8 +124,23 @@ export const api = {
   }
 };
 
-/** Récupère le PDF en tant que fichier, en propageant les erreurs JSON. */
-export async function fetchPdf(url, filename) {
+/** Nom proposé par le serveur dans Content-Disposition, s'il y en a un. */
+function filenameFrom(header) {
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header || '');
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+/**
+ * Récupère un fichier servi par l'API (PDF, CSV) en propageant les erreurs
+ * JSON : sans cela, une réponse d'erreur arriverait sous forme de fichier
+ * illisible au lieu d'un message.
+ */
+export async function fetchFile(url, fallbackName, { errorMessage } = {}) {
   const response = await fetch(url, {
     credentials: 'same-origin',
     headers: { 'X-Requested-With': 'transmission-app' }
@@ -135,10 +150,14 @@ export async function fetchPdf(url, filename) {
     const message = type.includes('application/json')
       ? (await response.json().catch(() => ({})))?.error
       : null;
-    throw new ApiError(message || MESSAGES[response.status] || 'Le PDF n’a pas pu être produit.', {
+    throw new ApiError(message || MESSAGES[response.status] || errorMessage || 'Le fichier n’a pas pu être produit.', {
       status: response.status
     });
   }
   const blob = await response.blob();
-  return new File([blob], filename, { type: 'application/pdf' });
+  const name = filenameFrom(response.headers.get('Content-Disposition')) || fallbackName;
+  return new File([blob], name, { type: blob.type || 'application/octet-stream' });
 }
+
+export const fetchPdf = (url, filename) =>
+  fetchFile(url, filename, { errorMessage: 'Le PDF n’a pas pu être produit.' });

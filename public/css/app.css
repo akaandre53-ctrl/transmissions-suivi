@@ -1036,6 +1036,7 @@ input:focus, select:focus, textarea:focus {
 }
 .row--inactive { opacity: .62; }
 .row__main { flex: 1; min-width: 0; }
+.row__actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .row__title { font-weight: 800; }
 .row__sub { font-size: .84rem; color: var(--muted); overflow-wrap: anywhere; }
 
