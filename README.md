@@ -245,7 +245,7 @@ L’en-tête illustré a été contrôlé à 375, 820, 1024, 1280 et 1920 px : a
 
 ### Mention « by Prime Advisors SB, Inc. »
 
-Elle apparaît en pied de chaque écran, mise en avant avec le logo sur la page
-de connexion, et en pied de chaque page du PDF, toujours cliquable vers
-https://www.primeadvisors-sb.com/. Le logo est servi par ce site : s’il ne
-répond pas, le nom en texte prend sa place.
+Elle apparaît en pied de chaque écran, connexion comprise, et en pied de chaque
+page du PDF, toujours cliquable vers https://www.primeadvisors-sb.com/. En
+texte seul : le logo demanderait une requête vers un site tiers depuis une
+application de santé, et se briserait si son adresse changeait.

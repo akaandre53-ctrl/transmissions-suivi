@@ -58,18 +58,6 @@
       </p>
     </div>
 
-    <a class="credit-feature" href="https://www.primeadvisors-sb.com/" target="_blank" rel="noopener">
-      <span class="credit-feature__by">by</span>
-      <picture>
-        <source srcset="https://www.primeadvisors-sb.com/assets/img/logo-light.png" media="(prefers-color-scheme: dark)">
-        <img class="credit-feature__logo" id="credit-logo"
-             src="https://www.primeadvisors-sb.com/assets/img/logo-dark.png"
-             alt="Prime Advisors SB, Inc." width="94" height="46" decoding="async">
-      </picture>
-      <span class="credit-feature__name" id="credit-name" hidden>Prime Advisors SB, Inc.</span>
-      <span data-icon="external"></span>
-      <span class="visually-hidden">(ouvre le site dans un nouvel onglet)</span>
-    </a>
   </section>
 </main>
 
@@ -86,16 +74,6 @@ import { hydrateIcons, icon } from '/js/icons.js';
 
 mountLandscape();
 hydrateIcons();
-
-// Le logo est servi par le site de Prime Advisors. S'il ne répond pas, le nom
-// en texte prend sa place plutôt qu'une image cassée.
-const logo = document.querySelector('#credit-logo');
-const showName = () => {
-  logo.closest('picture').hidden = true;
-  document.querySelector('#credit-name').hidden = false;
-};
-if (logo.complete && logo.naturalWidth === 0) showName();
-logo.addEventListener('error', showName);
 
 const form = document.querySelector('#form');
 const error = document.querySelector('#error');
