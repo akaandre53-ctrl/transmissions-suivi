@@ -275,6 +275,54 @@ try {
   check('la famille ne peut pas modifier un compte',
     (await familleA.call(`/api/admin/users/${aidante.id}`, { method: 'PATCH', body: { fullName: 'Pirate' } })).status === 403);
 
+  console.log('\nRenommage et suppression des personnes');
+  const nomRenomme = `${MARKER} A renommee ${STAMP}`;
+  const renommage = await admin.call(`/api/admin/beneficiaries/${personA}`, {
+    method: 'PATCH', body: { fullName: nomRenomme }
+  });
+  const renommageBody = await json(renommage);
+  check('renommage accepté', renommage.status === 200);
+  check('le nombre de transmissions touchées est renvoyé', renommageBody.transmissionsRenamed === 1,
+    `${renommageBody.transmissionsRenamed}`);
+
+  const apres = await query(
+    `SELECT b.full_name AS fiche, t.person_name, t.data->>'personName' AS dans_les_donnees
+       FROM beneficiaries b JOIN transmissions t ON t.beneficiary_id = b.id WHERE b.id = $1`,
+    [personA]
+  );
+  check('la fiche porte le nouveau nom', apres.rows[0].fiche === nomRenomme);
+  // Le nom est recopié dans la transmission ET dans son JSON : les deux doivent
+  // suivre, sinon le PDF régénéré afficherait encore l'ancien.
+  check('la transmission porte le nouveau nom', apres.rows[0].person_name === nomRenomme);
+  check('le JSON de la transmission aussi', apres.rows[0].dans_les_donnees === nomRenomme);
+
+  const historique = await json(await admin.call('/api/transmissions?limit=100'));
+  check('l’historique affiche le nouveau nom',
+    historique.items.find(i => i.id === transmissionId)?.personName === nomRenomme);
+
+  const pdfRenomme = Buffer.from(await (await admin.call(`/api/transmissions/${transmissionId}/pdf`)).arrayBuffer());
+  check('le PDF régénéré porte le nouveau nom', pdfRenomme.subarray(0, 5).toString('latin1') === '%PDF-');
+
+  const exportCsv = await admin.call(`/api/admin/beneficiaries/${personA}/export.csv`);
+  const csv = await exportCsv.text();
+  check('l’export CSV porte le nouveau nom', csv.includes(nomRenomme));
+
+  check('un nom déjà pris est refusé',
+    (await admin.call(`/api/admin/beneficiaries/${personA}`, { method: 'PATCH', body: { fullName: `${MARKER} B ${STAMP}` } })).status === 400);
+
+  check('une fiche avec transmissions ne peut pas être supprimée',
+    (await admin.call(`/api/admin/beneficiaries/${personA}`, { method: 'DELETE' })).status === 400);
+
+  const vide = await admin.call('/api/admin/beneficiaries', { method: 'POST', body: { fullName: `${MARKER} vide ${STAMP}` } });
+  const videId = (await json(vide)).beneficiary?.id;
+  check('fiche vide créée', vide.status === 201);
+  check('une fiche sans transmission se supprime',
+    (await admin.call(`/api/admin/beneficiaries/${videId}`, { method: 'DELETE' })).status === 200);
+  const reste = await query('SELECT count(*)::int n FROM beneficiaries WHERE id = $1', [videId]);
+  check('la fiche a bien disparu', reste.rows[0].n === 0);
+  check('la famille ne peut pas supprimer une fiche',
+    (await familleA.call(`/api/admin/beneficiaries/${personB}`, { method: 'DELETE' })).status === 403);
+
 } catch (error) {
   console.log('\nEXCEPTION :', error.message);
   ko++;

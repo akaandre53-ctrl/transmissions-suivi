@@ -44,18 +44,46 @@ adminRouter.post('/beneficiaries', requireRole('admin'), asyncHandler(async (req
 }));
 
 adminRouter.patch('/beneficiaries/:id', requireUuidParam(), requireRole('admin'), asyncHandler(async (req, res) => {
-  const patch = {};
-  if (typeof req.body?.isActive === 'boolean') patch.isActive = req.body.isActive;
+  let renamed = 0;
+  let updated = null;
+
   if (typeof req.body?.fullName === 'string') {
     const fullName = req.body.fullName.trim().replace(/\s+/g, ' ');
     if (fullName.length < 2) throw badRequest('Renseignez le nom de la personne accompagnée.');
+    if (fullName.length > 120) throw badRequest('Ce nom est trop long.');
     const existing = await beneficiaries.findByName(fullName);
     if (existing && existing.id !== req.params.id) throw badRequest('Une fiche existe déjà à ce nom.');
-    patch.fullName = fullName;
+    const result = await beneficiaries.rename(req.params.id, fullName);
+    if (!result.beneficiary) throw notFound('Fiche introuvable.');
+    updated = result.beneficiary;
+    renamed = result.transmissions;
   }
-  const updated = await beneficiaries.update(req.params.id, patch);
+
+  if (typeof req.body?.isActive === 'boolean') {
+    updated = await beneficiaries.update(req.params.id, { isActive: req.body.isActive });
+  }
+
   if (!updated) throw notFound('Fiche introuvable.');
-  res.json({ ok: true, beneficiary: updated });
+  res.json({ ok: true, beneficiary: updated, transmissionsRenamed: renamed });
+}));
+
+/**
+ * Supprime une fiche créée par erreur. Refusé dès qu'elle porte une
+ * transmission : l'archivage existe pour cela, et il garde l'historique.
+ */
+adminRouter.delete('/beneficiaries/:id', requireUuidParam(), requireRole('admin'), asyncHandler(async (req, res) => {
+  const removed = await beneficiaries.removeIfUnused(req.params.id);
+  if (removed) return res.json({ ok: true, beneficiary: removed });
+
+  const { rows: [person] } = await query(
+    `SELECT b.full_name, (SELECT count(*)::int FROM transmissions t WHERE t.beneficiary_id = b.id) AS transmissions
+       FROM beneficiaries b WHERE b.id = $1`,
+    [req.params.id]
+  );
+  if (!person) throw notFound('Fiche introuvable.');
+  throw badRequest(
+    `${person.full_name} porte ${person.transmissions} transmission(s) et ne peut pas être supprimée. Archivez-la pour qu'elle ne soit plus proposée à la saisie.`
+  );
 }));
 
 /**

@@ -109,6 +109,17 @@ santé. Les photos et les PDF suivent la même règle que leur transmission.
 Dans le formulaire, la personne se choisit dans une liste au lieu d'être tapée :
 un nom mal orthographié ne peut plus créer une personne fantôme.
 
+**Renommer une personne répercute le nom sur tout son historique.** Le nom est
+recopié dans chaque transmission à l'enregistrement, pour que le PDF et la
+feuille restent fidèles à ce qui a été transmis ; le renommage met donc à jour
+la fiche et ses transmissions dans la même transaction, sans quoi les PDF
+régénérés porteraient encore l'ancien nom. Les lignes déjà copiées dans Google
+Sheets gardent l'ancien nom, étant une copie figée.
+
+Une fiche créée par erreur se supprime tant qu'elle ne porte aucune
+transmission. Au-delà, seul l'archivage est possible : il la retire de la
+liste de saisie et conserve son historique.
+
 ### 4. Google Sheets (facultatif)
 
 L'application fonctionne sans. Si vous voulez le miroir :

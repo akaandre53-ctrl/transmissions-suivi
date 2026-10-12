@@ -85,6 +85,54 @@ export async function findByName(fullName) {
   return rows[0] || null;
 }
 
+/**
+ * Renomme une fiche et répercute le nom sur ses transmissions.
+ *
+ * Le nom est recopié dans chaque transmission à l'enregistrement, pour que le
+ * PDF et la feuille restent fidèles à ce qui a été transmis. Corriger la seule
+ * fiche laisserait donc l'ancien nom dans tout l'historique, et les PDF
+ * régénérés le porteraient encore. Les deux sont mis à jour ensemble.
+ *
+ * @returns {{ beneficiary: object|null, transmissions: number }}
+ */
+export async function rename(id, fullName) {
+  // Toutes les requêtes passent par `client` : la transaction détient l'unique
+  // connexion du pool en production.
+  return transaction(async client => {
+    const { rows } = await client.query(
+      `UPDATE beneficiaries SET full_name = $2 WHERE id = $1
+       RETURNING id, full_name, is_active, created_at`,
+      [id, fullName]
+    );
+    if (!rows[0]) return { beneficiary: null, transmissions: 0 };
+
+    const { rowCount } = await client.query(
+      `UPDATE transmissions
+          SET person_name = $2,
+              data = jsonb_set(data, '{personName}', to_jsonb($2::text)),
+              updated_at = now()
+        WHERE beneficiary_id = $1`,
+      [id, fullName]
+    );
+    return { beneficiary: rows[0], transmissions: rowCount };
+  });
+}
+
+/**
+ * Supprime une fiche jamais utilisée. Une fiche qui porte des transmissions
+ * n'est jamais supprimée : on l'archive, son historique reste consultable.
+ */
+export async function removeIfUnused(id) {
+  const { rows } = await query(
+    `DELETE FROM beneficiaries b
+      WHERE b.id = $1
+        AND NOT EXISTS (SELECT 1 FROM transmissions t WHERE t.beneficiary_id = b.id)
+      RETURNING id, full_name`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
 export async function update(id, { fullName, isActive }) {
   const { rows } = await query(
     `UPDATE beneficiaries

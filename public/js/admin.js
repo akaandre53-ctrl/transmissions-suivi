@@ -88,9 +88,92 @@ function renderPeople() {
     });
     actions.append(toggle);
 
-    row.append(main, actions);
+    // Une fiche jamais utilisée se supprime ; dès qu'elle porte une
+    // transmission, seul l'archivage reste possible.
+    if (person.transmissions === 0) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--quiet btn--small';
+      remove.style.color = 'var(--danger)';
+      remove.textContent = 'Supprimer';
+      remove.addEventListener('click', async () => {
+        if (!confirm(`Supprimer la fiche de ${person.full_name} ? Elle n’a aucune transmission.`)) return;
+        await run(() => api.admin.deleteBeneficiary(person.id), `Fiche de ${person.full_name} supprimée.`);
+      });
+      actions.append(remove);
+    }
+
+    row.append(main, actions, renameEditor(person));
     return row;
   }));
+}
+
+/**
+ * Renommer une personne accompagnée. Le nouveau nom se répercute sur tout
+ * l'historique, donc sur les PDF régénérés et les exports.
+ */
+function renameEditor(person) {
+  const details = document.createElement('details');
+  details.className = 'disclosure row__editor';
+
+  const summary = document.createElement('summary');
+  summary.className = 'btn btn--quiet btn--small';
+  summary.style.display = 'inline-flex';
+  summary.append(icon('user'), 'Renommer');
+  details.append(summary);
+
+  const form = document.createElement('form');
+  form.className = 'inline-form';
+  form.noValidate = true;
+
+  const label = document.createElement('label');
+  label.className = 'visually-hidden';
+  label.setAttribute('for', `renommer-${person.id}`);
+  label.textContent = `Nouveau nom pour ${person.full_name}`;
+
+  const input = document.createElement('input');
+  input.id = `renommer-${person.id}`;
+  input.name = 'fullName';
+  input.value = person.full_name;
+  input.autocomplete = 'off';
+
+  const save = document.createElement('button');
+  save.type = 'submit';
+  save.className = 'btn btn--primary btn--small';
+  save.append(icon('check'), 'Enregistrer');
+
+  form.append(label, input, save);
+
+  const hint = document.createElement('p');
+  hint.className = 'field__help';
+  hint.style.marginTop = '8px';
+  hint.textContent = person.transmissions
+    ? `Le nouveau nom remplacera l’ancien sur les ${person.transmissions} transmissions déjà enregistrées, donc dans l’historique et les PDF. Les lignes déjà copiées dans Google Sheets gardent l’ancien nom.`
+    : 'Cette fiche n’a encore aucune transmission.';
+  form.append(hint);
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const fullName = input.value.trim().replace(/\s+/g, ' ');
+    if (fullName === person.full_name) {
+      showError('Ce nom est déjà celui de la fiche.');
+      return;
+    }
+    if (fullName.length < 2) {
+      showError('Renseignez le nom de la personne accompagnée.');
+      input.focus();
+      return;
+    }
+    await run(
+      () => api.admin.updateBeneficiary(person.id, { fullName }),
+      person.transmissions
+        ? `${person.full_name} renommée en ${fullName}, sur la fiche et ses ${person.transmissions} transmissions.`
+        : `${person.full_name} renommée en ${fullName}.`
+    );
+  });
+
+  details.append(form);
+  return details;
 }
 
 /**

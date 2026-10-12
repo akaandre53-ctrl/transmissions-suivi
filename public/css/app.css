@@ -1038,6 +1038,12 @@ input:focus, select:focus, textarea:focus {
 .row__main { flex: 1; min-width: 0; }
 .row__actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 
+/* Le formulaire de renommage se déplie sous la ligne, sur toute sa largeur. */
+.row { flex-wrap: wrap; }
+.row__editor { flex-basis: 100%; margin-top: 4px; }
+.row__editor .inline-form { margin-top: 10px; flex-wrap: wrap; }
+.row__editor .field__help { flex-basis: 100%; }
+
 /* Sur téléphone, deux boutons d'action laissent trop peu de place au nom :
    il passe sur toute la largeur et les actions se rangent dessous. */
 @media (max-width: 560px) {

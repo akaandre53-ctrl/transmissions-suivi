@@ -121,7 +121,8 @@ export const api = {
       request(`/api/admin/users/${id}/beneficiaries`, { method: 'PUT', body: { beneficiaryIds } }),
     beneficiaries: () => request('/api/admin/beneficiaries'),
     createBeneficiary: fullName => request('/api/admin/beneficiaries', { method: 'POST', body: { fullName } }),
-    updateBeneficiary: (id, patch) => request(`/api/admin/beneficiaries/${id}`, { method: 'PATCH', body: patch })
+    updateBeneficiary: (id, patch) => request(`/api/admin/beneficiaries/${id}`, { method: 'PATCH', body: patch }),
+    deleteBeneficiary: id => request(`/api/admin/beneficiaries/${id}`, { method: 'DELETE' })
   }
 };
 
