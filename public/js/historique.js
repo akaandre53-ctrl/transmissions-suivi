@@ -14,7 +14,8 @@ const elements = {
   error: $('#error'),
   more: $('#more'),
   filters: $('#filters'),
-  heroMeta: $('#hero-meta')
+  heroMeta: $('#hero-meta'),
+  status: $('#status')
 };
 
 const state = {
@@ -225,6 +226,19 @@ function appendMoment(item) {
   pdf.addEventListener('click', () => downloadPdf(item, pdf));
   actions.append(pdf);
 
+  // Supprimer une transmission est réservé à l'administration, et sans retour.
+  if (state.user.role === 'admin') {
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn--quiet btn--small';
+    remove.style.color = 'var(--danger)';
+    remove.append(icon('close'), 'Supprimer');
+    remove.setAttribute('aria-label',
+      `Supprimer la transmission du ${date.toLocaleDateString('fr-FR', { timeZone: 'UTC' })} pour ${item.personName}`);
+    remove.addEventListener('click', () => removeTransmission(item, li, remove));
+    actions.append(remove);
+  }
+
   const sheet = SHEET_LABEL[item.sheetStatus];
   // Le statut de la copie Sheets n'intéresse que l'admin.
   if (sheet && state.user.role === 'admin') {
@@ -249,6 +263,50 @@ function excerpt(summary) {
     .filter(line => !/^(Bilan de la journée|Informations générales)$/.test(line))
     .map(line => line.replace(/^Résumé général : /, ''))
     .join(' · ');
+}
+
+/**
+ * Suppression définitive : la transmission, ses photos et sa ligne dans la
+ * feuille. La confirmation nomme la journée et compte les photos, pour qu'on
+ * voie ce qu'on efface avant de le faire.
+ */
+async function removeTransmission(item, card, button) {
+  const jour = new Date(`${item.entryDate}T12:00:00Z`)
+    .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const photos = item.photoCount ? ` et ses ${item.photoCount} photo${item.photoCount > 1 ? 's' : ''}` : '';
+
+  if (!confirm(
+    `Supprimer définitivement la transmission de ${item.personName} du ${jour}${photos} ?\n\n`
+    + 'Elle disparaîtra aussi de la feuille Google. Cette action est sans retour.'
+  )) return;
+
+  button.disabled = true;
+  try {
+    const result = await api.remove(item.id);
+    const liste = card.parentElement;
+    card.remove();
+    // Le mois perd son intitulé en même temps que sa dernière journée.
+    if (liste && !liste.querySelector('.moment')) {
+      liste.previousElementSibling?.remove();
+      liste.remove();
+    }
+    if (!elements.timeline.querySelector('.moment')) showEmpty();
+    setStatus(result.sheet?.removed
+      ? `Transmission du ${jour} supprimée, ligne retirée de la feuille.`
+      : `Transmission du ${jour} supprimée.`);
+  } catch (error) {
+    button.disabled = false;
+    showError(error.message || 'Suppression impossible.');
+  }
+}
+
+let statusTimer = null;
+function setStatus(message) {
+  const status = elements.status;
+  status.className = 'status status--saved';
+  status.replaceChildren(icon('check'), message);
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => status.replaceChildren(), 6000);
 }
 
 async function downloadPdf(item, button) {

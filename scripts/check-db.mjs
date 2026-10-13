@@ -323,6 +323,27 @@ try {
   check('la famille ne peut pas supprimer une fiche',
     (await familleA.call(`/api/admin/beneficiaries/${personB}`, { method: 'DELETE' })).status === 403);
 
+  console.log('\nSuppression d’une transmission');
+  check('la famille ne peut pas supprimer',
+    (await familleA.call(`/api/transmissions/${transmissionId}`, { method: 'DELETE' })).status === 403);
+  check('sans session, refusé',
+    (await anonymous(`/api/transmissions/${transmissionId}`, { method: 'DELETE' })).status === 401);
+
+  const avant = await query('SELECT count(*)::int n FROM images WHERE transmission_id = $1', [transmissionId]);
+  const suppression = await admin.call(`/api/transmissions/${transmissionId}`, { method: 'DELETE' });
+  const resume = await json(suppression);
+  check('l’admin supprime', suppression.status === 200);
+  check('la réponse décrit ce qui a été effacé', resume.photos === avant.rows[0].n && Boolean(resume.personName),
+    `${resume.photos} photo(s), ${resume.personName}`);
+
+  const resteTransmission = await query('SELECT count(*)::int n FROM transmissions WHERE id = $1', [transmissionId]);
+  check('la transmission a disparu', resteTransmission.rows[0].n === 0);
+  // Les photos partent avec elle par la contrainte ON DELETE CASCADE.
+  const photosRestantes = await query('SELECT count(*)::int n FROM images WHERE transmission_id = $1', [transmissionId]);
+  check('ses photos aussi', photosRestantes.rows[0].n === 0);
+  check('une seconde suppression répond introuvable',
+    (await admin.call(`/api/transmissions/${transmissionId}`, { method: 'DELETE' })).status === 404);
+
 } catch (error) {
   console.log('\nEXCEPTION :', error.message);
   ko++;

@@ -279,7 +279,6 @@ img { max-width: 100%; }
 .nav__link {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   min-height: 40px;
   padding: 8px 14px;
   border-radius: var(--radius-pill);
@@ -289,6 +288,9 @@ img { max-width: 100%; }
   text-decoration: none;
   transition: background .18s var(--ease), color .18s var(--ease);
 }
+/* Pas de gap ici : « Admin » et « istration » sont deux noeuds separes, et
+   un gap les ecarterait au milieu du mot. Seule l'icone prend sa marge. */
+.nav__link .icon { margin-right: 8px; }
 .nav__link:hover { background: var(--surface-soft); color: var(--ink); }
 .nav__link[aria-current='page'] { background: var(--brand-soft); color: var(--brand); }
 .nav__link[hidden] { display: none; }

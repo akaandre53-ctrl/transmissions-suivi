@@ -1,5 +1,5 @@
 import { isSheetsConfigured } from '../config.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { MAX_IMAGES } from '../domain/schema.js';
 import { canReadImage, canReadTransmission, isUuid } from '../domain/access.js';
 import { validateClientRef, validateImageIds, validateTransmission } from '../domain/validate.js';
@@ -9,7 +9,7 @@ import * as repo from '../repositories/transmissions.repo.js';
 import { transaction } from '../db/pool.js';
 import { buildSummary, buildWhatsappGreeting } from './message.service.js';
 import { renderTransmissionPdf, pdfFilename } from './pdf.service.js';
-import { mirrorToSheet } from './sheets.service.js';
+import { mirrorToSheet, removeFromSheet } from './sheets.service.js';
 
 /**
  * Enregistre une transmission.
@@ -100,6 +100,37 @@ export async function submitTransmission({ user, payload }) {
     created: true,
     sheet,
     greeting: buildWhatsappGreeting(values)
+  };
+}
+
+/**
+ * Supprime une transmission, ses photos, et la ligne correspondante dans la
+ * feuille. Réservé à l'administration : c'est une donnée de santé, et
+ * l'opération est sans retour.
+ *
+ * La feuille est traitée après la base et sans pouvoir la faire échouer : la
+ * base est la source de vérité, et une ligne restée dans le tableau se retire
+ * à la main.
+ */
+export async function deleteTransmission({ user, id }) {
+  if (user.role !== 'admin') throw forbidden('Seule l’administration peut supprimer une transmission.');
+
+  const transmission = await repo.findByIdWithAuthor(id);
+  if (!transmission) throw notFound('Cette transmission n’existe pas.');
+  const photos = await repo.countPhotos(id);
+
+  const removed = await repo.remove(id);
+  if (!removed) throw notFound('Cette transmission n’existe pas.');
+
+  const sheet = transmission.sheet_status === 'synced'
+    ? await removeFromSheet(id)
+    : { removed: false, reason: 'jamais_copiée' };
+
+  return {
+    entryDate: toPublic(transmission).entryDate,
+    personName: transmission.person_name,
+    photos,
+    sheet
   };
 }
 

@@ -113,6 +113,61 @@ export async function mirrorToSheet(transmission, photoCount = 0) {
   }
 }
 
+/**
+ * Retire de la feuille la ligne d'une transmission supprimée, repérée par la
+ * colonne « Identifiant ».
+ *
+ * Ne lève jamais : une feuille injoignable ne doit pas empêcher la suppression
+ * en base, qui est la source de vérité. Le pire cas est une ligne orpheline
+ * dans le tableau, que l'on peut retirer à la main.
+ *
+ * @returns {{ removed: boolean, reason?: string }}
+ */
+export async function removeFromSheet(transmissionId) {
+  if (!isSheetsConfigured()) return { removed: false, reason: 'non_configuré' };
+  const reference = String(transmissionId).slice(0, 8);
+
+  try {
+    const sheets = getSheets();
+    const tab = config.sheets.tabName;
+    const spreadsheetId = config.sheets.spreadsheetId;
+
+    const meta = await withTimeout(sheets.spreadsheets.get({ spreadsheetId }), config.sheets.timeoutMs);
+    const sheetId = meta.data.sheets.find(entry => entry.properties.title === tab)?.properties.sheetId;
+    if (sheetId === undefined) return { removed: false, reason: 'onglet_introuvable' };
+
+    const column = SHEET_HEADER.indexOf('Identifiant');
+    const got = await withTimeout(
+      sheets.spreadsheets.values.get({ spreadsheetId, range: `${tab}!A:BZ` }),
+      config.sheets.timeoutMs
+    );
+    const rows = got.data.values || [];
+    // De bas en haut : supprimer par le haut décalerait les indices suivants.
+    const targets = rows
+      .map((row, index) => [row[column], index])
+      .filter(([value, index]) => index > 0 && value === reference)
+      .map(([, index]) => index)
+      .reverse();
+
+    for (const index of targets) {
+      await withTimeout(sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: index, endIndex: index + 1 } }
+          }]
+        }
+      }), config.sheets.timeoutMs);
+    }
+    return { removed: targets.length > 0, rows: targets.length };
+  } catch (error) {
+    sheetsClient = null;
+    headerChecked = false;
+    console.error('[sheets] ligne non retirée :', error.message);
+    return { removed: false, reason: error.message };
+  }
+}
+
 /** Rejoue les transmissions en attente. Appelée par la route de reprise. */
 export async function retryPending(limit = 20) {
   if (!isSheetsConfigured()) return { attempted: 0, synced: 0, skipped: 'non_configuré' };

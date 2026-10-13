@@ -128,6 +128,19 @@ export async function listForExport(beneficiaryId, { from = null, to = null } = 
   return rows;
 }
 
+/**
+ * Supprime une transmission. Ses photos partent avec elle, par la contrainte
+ * ON DELETE CASCADE de la table images.
+ */
+export async function remove(id) {
+  const { rows } = await query(
+    `DELETE FROM transmissions WHERE id = $1
+     RETURNING id, entry_date, person_name, sheet_status`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
 export async function countPhotos(transmissionId) {
   const { rows } = await query(
     'SELECT count(*)::int AS total FROM images WHERE transmission_id = $1',

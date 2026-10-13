@@ -109,6 +109,7 @@ export const api = {
   submit: payload => request('/api/transmissions', { method: 'POST', body: payload, timeoutMs: 45000 }),
   list: params => request(`/api/transmissions?${new URLSearchParams(params)}`),
   one: id => request(`/api/transmissions/${id}`),
+  remove: id => request(`/api/transmissions/${id}`, { method: 'DELETE' }),
 
   beneficiaries: () => request('/api/beneficiaries'),
 

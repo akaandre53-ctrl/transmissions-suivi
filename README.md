@@ -222,7 +222,7 @@ npm run check:db
 
 Contrôle d'intégration contre la vraie base, **à lancer avant chaque mise en
 production**. Il déroule le parcours complet (connexion, photo, enregistrement,
-idempotence, PDF) et éprouve le cloisonnement : deux familles, deux personnes,
+idempotence, PDF, suppression) et éprouve le cloisonnement : deux familles, deux personnes,
 chacune doit rester aveugle aux transmissions, aux PDF et aux photos de l'autre.
 Il efface ensuite tout ce qu'il a créé, y compris dans la feuille Google.
 
@@ -266,6 +266,30 @@ une apostrophe, sans quoi le tableur l’exécuterait comme une formule.
 
 Filtre de période possible sur la route :
 `/api/admin/beneficiaries/<id>/export.csv?from=2026-01-01&to=2026-03-31`.
+
+---
+
+## Supprimer une transmission
+
+Dans l'historique, l'administration dispose d'un bouton **Supprimer** sur chaque
+journée. Une confirmation nomme la personne, la date et le nombre de photos
+avant que rien ne soit effacé.
+
+La suppression est définitive et emporte d'un seul geste :
+
+- la transmission,
+- ses photos,
+- sa ligne dans la feuille Google, retrouvée par la colonne `Identifiant`.
+
+Réservé au rôle `admin`, vérifié côté serveur : `DELETE /api/transmissions/:id`
+répond 403 à un aidant comme à une famille, même en appelant la route
+directement. Une fiche « personne accompagnée » s'archive, une transmission ne
+s'archive pas : elle existe, ou elle n'existe plus.
+
+Si la copie Sheets n'a jamais eu lieu (statut `pending`, `failed` ou
+`skipped`), aucune ligne n'est cherchée. Si la feuille est injoignable, la
+suppression en base aboutit quand même et le message ne promet pas le
+contraire : la base reste la référence.
 
 ---
 

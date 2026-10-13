@@ -40,6 +40,14 @@ transmissionsRouter.get('/:id', requireUuidParam(), requireAuth, asyncHandler(as
   res.json({ ok: true, transmission: await service.getOne({ user: req.user, id: req.params.id }) });
 }));
 
+/**
+ * Supprime une transmission. Réservé à l'administration, sans retour possible :
+ * la transmission, ses photos et sa ligne dans la feuille disparaissent.
+ */
+transmissionsRouter.delete('/:id', requireUuidParam(), requireRole('admin'), asyncHandler(async (req, res) => {
+  res.json({ ok: true, ...(await service.deleteTransmission({ user: req.user, id: req.params.id })) });
+}));
+
 transmissionsRouter.get('/:id/pdf', requireUuidParam(), requireAuth, asyncHandler(async (req, res) => {
   const { buffer, filename } = await service.getPdf({ user: req.user, id: req.params.id });
   res.setHeader('Content-Type', 'application/pdf');
